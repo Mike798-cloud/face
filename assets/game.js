@@ -1,10 +1,12 @@
 (() => {
   'use strict';
 
-  const VERSION = 4;
-  const ASSET_REV = '?v=rust4';
-  const SAVE_KEY = 'mianmu-the-face-of-it-save-v4';
-  const META_KEY = 'mianmu-the-face-of-it-meta-v4';
+  const VERSION = 5;
+  const ASSET_REV = '?v=clean5';
+  const SAVE_KEY = 'mianmu-the-face-of-it-save-v5';
+  const META_KEY = 'mianmu-the-face-of-it-meta-v5';
+  const LEGACY_SAVE_KEYS = ['mianmu-the-face-of-it-save-v4','mianmu-the-face-of-it-save-v3'];
+  const LEGACY_META_KEYS = ['mianmu-the-face-of-it-meta-v4','mianmu-the-face-of-it-meta-v3'];
   const app = document.getElementById('app');
   const modalRoot = document.getElementById('modal-root');
   const toastRoot = document.getElementById('toast-root');
@@ -80,11 +82,17 @@
     removeItem(key){ try{window.localStorage.removeItem(key)}catch(_){memoryStore.delete(key)} }
   };
 
-  let meta = loadJSON(META_KEY, {completed:false, endings:[], bestTime:null, ngp:false});
-  let state = loadJSON(SAVE_KEY, defaultState());
+  function loadWithLegacy(primary, legacyKeys, fallback){
+    const direct=loadJSON(primary,null); if(direct) return direct;
+    for(const key of legacyKeys){const value=loadJSON(key,null); if(value){try{storage.setItem(primary,JSON.stringify(value))}catch(_){} return value}}
+    return fallback;
+  }
+  let meta = loadWithLegacy(META_KEY, LEGACY_META_KEYS, {completed:false, endings:[], bestTime:null, ngp:false});
+  let state = loadWithLegacy(SAVE_KEY, LEGACY_SAVE_KEYS, defaultState());
   normalizeState();
   let sideTab = 'items';
   let selectedObs = [];
+  let heldItemId = null;
   let timerHandle = null;
 
   function defaultState(){
@@ -97,7 +105,7 @@
       shopChangesAvailable:0, shopChangesSeen:[],
       postmanChoice:null, blankItem:null, blankDirection:null,
       finalUnlocked:false, finalStations:[], finalPairing:{}, motherShown:false, centerSolved:false,
-      ending:null, hiddenEnding:false, hints:{}, mistakes:0, ngp:!!meta.completed
+      ending:null, hiddenEnding:false, hints:{}, mistakes:0, hotspotAssist:false, ngp:!!meta.completed
     };
   }
 
@@ -136,20 +144,6 @@
   function startTimer(){ if(timerHandle)clearInterval(timerHandle); timerHandle=setInterval(()=>{if(state.started && !state.ending){state.playSeconds++; if(state.playSeconds%10===0)save()}},1000) }
   function fmtTime(sec){const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;return [h,m,s].map(x=>String(x).padStart(2,'0')).join(':')}
 
-  function progress(){
-    let p=0;
-    if(state.prologue.aligned)p+=8;
-    if(state.prologue.secret)p+=8;
-    if(state.prologue.mask)p+=10;
-    if(state.prologue.water)p+=9;
-    p+=completedMain()*9;
-    p+=state.hiddenDone.length*3;
-    p+=state.links.length*1.5;
-    p+=state.finalStations.length*4;
-    if(state.centerSolved)p+=7;
-    if(state.ending)p=100;
-    return Math.min(100,Math.round(p));
-  }
 
   function currentChapterLabel(){
     if(!state.started)return '尚未开始';
@@ -160,18 +154,6 @@
     return '终章 · 选择';
   }
 
-  function objective(){
-    if(!state.prologue.aligned)return ['让木盒与镜中的脸发生关系','检查镜子、灯、瓷娃娃、剪刀与师父的椅子。'];
-    if(!state.prologue.secret)return ['打开师父留下的暗门','木盒里已经找到暗门钥匙。'];
-    if(!state.prologue.mask)return ['按面具铺行规完成师父面具','从密室找齐相貌、习惯、见证三种痕迹。'];
-    if(!state.prologue.water)return ['理解水底记忆的异常规则','这段记忆正在倒放；找出唯一不服从规则的东西。'];
-    if(completedMain()<5)return ['进入不同人的“脸”','五张主线面具顺序自由；注意每次回铺子的细小变化。'];
-    if(state.links.length<3)return ['整理观察关系','终章前至少亲手建立三组有效的物理/时间/行为关系。'];
-    if(!state.finalUnlocked)return ['照一次镜子','五种残留习惯已经同时出现在阿七身上。'];
-    if(state.finalStations.length<3)return ['完成三站共振验证',`已完成 ${state.finalStations.length}/3；三座验证台顺序自由。`];
-    if(!state.centerSolved)return ['处理无法归类的透明残响','六种稳定功能已经成功；机器仍在索取“第七类”。'];
-    return ['决定怎样继续生活','没有一个结局会替阿七证明谁才是“正确的脸”。'];
-  }
 
   function render(){
     if(!state.started){renderTitle();return}
@@ -182,29 +164,22 @@
 
   function renderTitle(){
     state.scene='title';
-    app.innerHTML=`<main class="title-screen screen">
+    app.innerHTML=`<main class="title-screen clean-title screen">
       <div class="title-bg"></div>
-      <section class="title-left">
+      <section class="title-left clean-title-left">
         <div class="title-mark">面目</div>
         <div class="title-en">THE FACE OF IT</div>
-        <div class="title-sub">海岸民俗木刻 · 超现实网页解谜</div>
-        <div class="title-menu">
+        <div class="title-sub">海湾第七码头 · 第七日</div>
+        <div class="title-menu clean-title-menu">
           <button class="menu-btn" data-act="new">新游戏</button>
           <button class="menu-btn" data-act="continue" ${storage.getItem(SAVE_KEY)?'':'disabled'}>继续游戏</button>
           <button class="menu-btn" data-act="chapters" ${meta.completed?'':'disabled'}>章节回望</button>
           <button class="menu-btn" data-act="settings">设置</button>
           <button class="menu-btn" data-act="credits">制作说明</button>
-          <button class="menu-btn" data-act="about">关于本作</button>
         </div>
-        <div class="title-version">v3.0 · 单文件状态系统 · ${meta.completed?'二周目“残响视角”已开放':'第一次游玩建议佩戴耳机'}</div>
+        <div class="title-version">v5.0 · 场景优先交互 · ${meta.completed?'残响视角已开放':'建议佩戴耳机'}</div>
       </section>
-      <aside class="title-card">
-        <div class="kicker">海湾第七码头 · 第七日</div>
-        <h2>一家祖传面具铺，师父失踪了。</h2>
-        <p>镇上的人借脸去求婚、工作、道歉和送别。阿七替别人做了二十年脸，却从来没有认真看过自己的左半张脸。</p>
-        <p class="muted">怪诞不是突然出现的怪物，而是房间安静地执行一条不正常的规则。</p>
-        <div class="title-stats"><div class="stat">目标盲玩时长<b>62–70 min</b></div><div class="stat">普通结局<b>3</b></div><div class="stat">主线面具<b>5 + 2</b></div><div class="stat">历史最快<b>${meta.bestTime?fmtTime(meta.bestTime):'—'}</b></div></div>
-      </aside>
+      <div class="title-whisper">师父的灯还亮着。门没有锁。</div>
     </main>`;
     app.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',()=>titleAction(b.dataset.act)));
     syncAmbience();
@@ -224,26 +199,31 @@
   }
 
   function renderGame(){
-    const [objTitle,objText]=objective();
-    app.innerHTML=`<main class="game-screen screen">
-      <header class="topbar">
-        <div class="brand"><div class="brand-mark">面</div><div class="brand-copy"><div class="brand-title">面目 · THE FACE OF IT</div><div class="brand-chapter">${currentChapterLabel()}</div></div></div>
-        <div class="progress-wrap"><div class="progress-track"><div class="progress-bar" style="width:${progress()}%"></div></div><span class="progress-num">${progress()}%</span></div>
-        <div class="top-actions">
-          <button class="top-btn" data-top="notes">观察<b>关系记录</b></button>
-          <button class="top-btn" data-top="hint">帮助<b>渐进提示</b></button>
-          <button class="top-btn" data-top="sound">声音<b>${state.audio?'开启':'关闭'}</b></button>
-          <button class="top-btn" data-top="menu">案卷<b>存档菜单</b></button>
-        </div>
-      </header>
-      <section class="main-grid">
-        <div class="stage-shell">${sceneHTML()}</div>
-        ${sidePanelHTML()}
-      </section>
-      <footer class="bottom-bar"><div class="objective"><b>${objTitle}</b><span>${objText}</span></div><div class="habit-strip">${state.habits.length?state.habits.map(h=>`<span class="habit-chip active">${esc(h)}</span>`).join(''):'<span class="habit-chip">尚未残留他人的习惯</span>'}</div><button class="drawer-toggle" data-drawer>卷宗</button></footer>
+    app.innerHTML=`<main class="game-screen clean-game screen ${state.hotspotAssist?'assist-on':''}">
+      <section class="stage-shell clean-stage-shell">${sceneHTML()}</section>
+      <nav class="clean-toolbar" aria-label="游戏功能">
+        <button class="icon-btn" data-top="notes" data-label="观察记录" aria-label="观察记录">◉</button>
+        <button class="icon-btn" data-top="hint" data-label="提示" aria-label="提示">?</button>
+        <button class="icon-btn" data-top="support" data-label="支持作者" aria-label="支持作者">￥</button>
+        <button class="icon-btn ${state.audio?'':'is-off'}" data-top="sound" data-label="声音${state.audio?'开启':'关闭'}" aria-label="声音${state.audio?'开启':'关闭'}">♪</button>
+        <button class="icon-btn" data-top="menu" data-label="菜单" aria-label="菜单">☰</button>
+      </nav>
+      ${inventoryDockHTML()}
+      ${heldItemId?`<div class="held-item-pill" aria-live="polite">${esc(itemLabel(heldItemId))}</div>`:''}
     </main>`;
     bindGameEvents();
   }
+
+  function inventoryDockHTML(){
+    const items=state.inventory;
+    if(!items.length)return '';
+    return `<div class="inventory-dock" aria-label="物品栏">${items.map(x=>`<button class="inventory-slot ${heldItemId===x.id?'selected':''}" draggable="true" data-item="${esc(x.id)}" aria-label="${esc(x.label)}" data-label="${esc(x.label)}"><span>${esc(shortItemLabel(x.label))}</span></button>`).join('')}</div>`;
+  }
+  function shortItemLabel(label){
+    const map={'无齿黑铁钥匙':'钥匙','微笑面具半成品':'面具','反复拆开的黑线':'黑线','童年刻痕木屑':'木屑','师父的微笑面具':'面具'};
+    return map[label]||String(label||'物').replace(/[·（(].*$/,'').slice(0,2);
+  }
+  function itemLabel(id){return state.inventory.find(x=>x.id===id)?.label||id}
 
   function sceneHTML(){
     const scene=state.scene;
@@ -261,7 +241,7 @@
       finale:{img:'finale.webp',title:'三站共振',caption:'六种稳定功能足以制造一张完整的脸，却不一定足以定义一个人。',cls:''}
     };
     const s=map[scene]||map.shop;
-    return `<div class="scene-frame ${s.cls}"><div class="scene-bg" style="background-image:url('assets/images/${s.img}${ASSET_REV}')"></div><div class="scene-vignette"></div><div class="scene-overlays">${sceneHotspots(scene)}</div><div class="scene-caption"><strong>${s.title}</strong>${s.caption}</div></div>`;
+    return `<div class="scene-frame ${s.cls}" data-scene="${scene}" aria-label="${esc(s.title)}"><div class="scene-bg" style="background-image:url('assets/images/${s.img}${ASSET_REV}')"></div><div class="scene-overlays">${sceneHotspots(scene)}</div></div>`;
   }
 
   function shopCaption(){
@@ -273,7 +253,7 @@
     return '工作台下方的地板已经打开，三座旧式验证台在下面等着。';
   }
 
-  function hs(id,label,left,top,done=false,subtle=false){return `<button class="hotspot ${done?'done':''} ${subtle?'subtle':''}" style="left:${left}%;top:${top}%" data-hot="${id}"><span class="dot"></span>${label}</button>`}
+  function hs(id,label,left,top,done=false,subtle=false){return `<button class="hotspot ${done?'done':''} ${subtle?'subtle':''}" style="left:${left}%;top:${top}%" data-hot="${id}" data-label="${esc(label)}" aria-label="${esc(label)}"><span class="dot"></span></button>`}
   function sceneHotspots(scene){
     if(scene==='shop'){
       let a=[];
@@ -300,14 +280,11 @@
       return [hs('jars','七只保存罐',18,22,state.observations.includes('jars')),hs('ledger','旧工艺账',58,31,state.observations.includes('master_rule')),hs('halfmask','微笑面具半成品',72,57,state.inventory.some(x=>x.id==='halfmask')),hs('blackthread','反复拆开的黑线',30,65,state.inventory.some(x=>x.id==='blackthread')),hs('heightmark','童年身高刻痕的木屑',44,46,state.inventory.some(x=>x.id==='woodchip')),hs('craft','工作台 · 制作面具',58,67,state.prologue.mask)].join('');
     }
     if(scene==='water')return hs('clockpuzzle','唯一仍向前的墙钟',51,28,state.prologue.water)+hs('waterobs','倒流的房间',22,58,state.observations.includes('water_reverse'));
-    if(['mayor','butcher','elaine','milo','postman','soren','blank'].includes(scene))return `<button class="hotspot" style="right:3%;top:4%" data-hot="returnshop"><span class="dot"></span>返回铺子</button>`;
+    if(['mayor','butcher','elaine','milo','postman','soren','blank'].includes(scene))return `<button class="scene-back" data-hot="returnshop" data-label="返回面具铺" aria-label="返回面具铺">←</button>`;
     if(scene==='finale')return hs('stations','三座验证台',41,38,state.finalStations.length===3)+hs('center','中央黑色空位',67,58,state.centerSolved);
     return '';
   }
 
-  function sidePanelHTML(){
-    return `<aside class="side-panel" id="side-panel"><div class="side-head"><div class="kicker">阿七的卷宗边页</div><h3>${sideTab==='items'?'临时物件':sideTab==='obs'?'观察记录':'面具墙'}</h3><p>${sideTab==='obs'?`${state.observations.length} 条事实 · ${state.links.length} 组已建立关系`:'只记录已经亲手取得或确认的内容'}</p></div><div class="side-tabs"><button class="tab-btn ${sideTab==='items'?'active':''}" data-tab="items">物件</button><button class="tab-btn ${sideTab==='obs'?'active':''}" data-tab="obs">观察</button><button class="tab-btn ${sideTab==='masks'?'active':''}" data-tab="masks">面具</button></div><div class="side-scroll">${sideTabContent()}</div></aside>`;
-  }
 
   function sideTabContent(){
     if(sideTab==='items'){
@@ -324,17 +301,73 @@
 
   function bindGameEvents(){
     document.querySelectorAll('[data-top]').forEach(b=>b.onclick=()=>topAction(b.dataset.top));
-    document.querySelectorAll('[data-hot]').forEach(b=>b.onclick=()=>hotAction(b.dataset.hot));
-    document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{sideTab=b.dataset.tab;render()});
-    document.querySelector('[data-drawer]')?.addEventListener('click',()=>document.getElementById('side-panel')?.classList.toggle('open'));
-    document.querySelectorAll('[data-obs]').forEach(c=>c.onclick=()=>toggleObs(c.dataset.obs));
-    document.querySelector('[data-connect]')?.addEventListener('click',connectSelectedObs);
-    document.querySelectorAll('[data-mask]').forEach(c=>c.onclick=()=>{const id=c.dataset.mask;if(c.classList.contains('locked'))return;openMask(id)});
+    document.querySelectorAll('[data-hot]').forEach(b=>b.onclick=()=>handleHotspotInteraction(b.dataset.hot));
+    bindInventoryInteractions();
+  }
+
+  function bindInventoryInteractions(){
+    document.querySelectorAll('[data-item]').forEach(b=>{
+      b.onclick=()=>selectHeldItem(b.dataset.item);
+      b.addEventListener('dragstart',e=>{heldItemId=b.dataset.item;b.classList.add('selected');e.dataTransfer?.setData('text/plain',heldItemId);if(e.dataTransfer)e.dataTransfer.effectAllowed='copy';document.querySelector('.scene-frame')?.classList.add('drag-active')});
+      b.addEventListener('dragend',()=>document.querySelector('.scene-frame')?.classList.remove('drag-active'));
+    });
+    document.querySelectorAll('[data-hot]').forEach(t=>{
+      t.addEventListener('dragover',e=>{e.preventDefault();t.classList.add('drop-hover')});
+      t.addEventListener('dragleave',()=>t.classList.remove('drop-hover'));
+      t.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();t.classList.remove('drop-hover');const item=e.dataTransfer?.getData('text/plain')||heldItemId;if(item)useItemOnTarget(item,t.dataset.hot)});
+    });
+    const frame=document.querySelector('.scene-frame');
+    if(frame){
+      frame.addEventListener('dragover',e=>{e.preventDefault();frame.classList.add('drag-active')});
+      frame.addEventListener('dragleave',e=>{if(e.target===frame)frame.classList.remove('drag-active')});
+      frame.addEventListener('drop',e=>{e.preventDefault();frame.classList.remove('drag-active');const item=e.dataTransfer?.getData('text/plain')||heldItemId;if(!item)return;const target=nearestHotspot(e.clientX,e.clientY);if(target)useItemOnTarget(item,target.dataset.hot);else toast(`${itemLabel(item)}没有找到可作用的位置。`)});
+    }
+  }
+
+  function nearestHotspot(x,y){
+    const nodes=[...document.querySelectorAll('.scene-frame [data-hot]:not(.scene-back)')];
+    let best=null,dist=Infinity;
+    for(const el of nodes){const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,d=Math.hypot(cx-x,cy-y);if(d<dist){dist=d;best=el}}
+    return dist<150?best:null;
+  }
+
+  function selectHeldItem(id){
+    heldItemId=heldItemId===id?null:id;
+    if(heldItemId)toast(`拿起：${itemLabel(heldItemId)}。拖到场景，或先选物品再点目标。`);
+    render();
+  }
+
+  function handleHotspotInteraction(id){
+    if(id==='returnshop'){heldItemId=null;hotAction(id);return}
+    if(heldItemId){useItemOnTarget(heldItemId,id);return}
+    hotAction(id);
+  }
+
+  function clearHeld(){heldItemId=null;render()}
+
+  function useItemOnTarget(item,target){
+    const label=itemLabel(item);
+    if(item==='key'&&target==='darkdoor'){
+      heldItemId=null;removeItem('key');state.prologue.secret=true;state.scene='secret';save();playSfx('knock');render();
+      showStory(['黑铁片滑进墙缝，几乎没有阻力。','整块木板向里退开。','潮湿石墙后排列着七只玻璃罐。'],()=>{closeModal();render()});return;
+    }
+    if(['halfmask','blackthread','woodchip'].includes(item)&&target==='craft'){heldItemId=null;openCraftPuzzle();return}
+    const reactions={
+      'key:box':'木盒没有钥匙孔。黑铁靠近时，镜中的盒面反而更像阿七。',
+      'key:jars':'钥匙贴近玻璃，罐中组织缓慢模仿了一次握钥匙的动作。',
+      'blackthread:jars':'黑线靠近玻璃后微微绷紧，像有人从另一端拉了一下。',
+      'woodchip:jars':'木屑浮在玻璃外侧；里面的组织没有回应木头，只回应阿七的脸。',
+      'halfmask:jars':'半成品靠近保存罐时，罐中几处轮廓短暂朝同一个表情收拢。',
+      'mastermask:clockpuzzle':'面具内侧传来的钟声与墙钟错开半拍。'
+    };
+    const msg=reactions[`${item}:${target}`];
+    if(msg){toast(msg);return}
+    toast(`${label}放到这里，没有发生能够验证的新变化。`);
   }
 
   function toggleObs(id){
     if(selectedObs.includes(id))selectedObs=selectedObs.filter(x=>x!==id);else{if(selectedObs.length>=2)selectedObs.shift();selectedObs.push(id)}
-    render(); sideTab='obs';
+    sideTab='obs';
   }
 
   function connectSelectedObs(){
@@ -342,12 +375,14 @@
     const [a,b]=selectedObs; const pair=VALID_CONNECTIONS.find(x=>(x[0]===a&&x[1]===b)||(x[0]===b&&x[1]===a));
     if(pair){if(!state.links.some(l=>(l[0]===pair[0]&&l[1]===pair[1])||(l[0]===pair[1]&&l[1]===pair[0])))state.links.push([a,b,pair[2]]);toast(`关系成立：${pair[2]}`,'good');}
     else {state.mistakes++;toast('两张事实可以同时存在，但目前没有形成可验证的物理、时间或行为关系。','warn')}
-    selectedObs=[];save();render();sideTab='obs';
+    selectedObs=[];save();sideTab='obs';
   }
 
   function topAction(act){
-    if(act==='notes'){sideTab='obs';render();setTimeout(()=>document.getElementById('side-panel')?.classList.add('open'),0)}
+    if(act!=='sound'&&heldItemId){heldItemId=null;render()}
+    if(act==='notes')openNotebook('obs');
     else if(act==='hint')openHint();
+    else if(act==='support')openSupport();
     else if(act==='sound'){state.audio=!state.audio;save();syncAmbience();render()}
     else if(act==='menu')openGameMenu();
   }
@@ -356,7 +391,7 @@
     if(id==='returnshop'){state.scene='shop';state.currentMask=null;save();render();return}
     if(['mirror','lamp','doll','scissors','chair'].includes(id)){discoverFeature(id);return}
     if(id==='box'){openBoxPuzzle();return}
-    if(id==='darkdoor'){state.prologue.secret=true;state.scene='secret';save();playSfx('knock');render();showStory(['钥匙没有齿，只是一片黑色薄铁。','它插进后屋墙缝时，整块木板像门一样向里退。','潮湿石墙后排列着七只玻璃罐。'],()=>{closeModal();render()});return}
+    if(id==='darkdoor'){toast(state.inventory.some(x=>x.id==='key')?'墙缝里有一道刚好容得下黑铁片的窄槽。试着把钥匙拖过去。':'木板后像有空腔，但这里没有普通锁孔。');return}
     if(id==='jars'){addObs('jars');openInfo('七只保存罐',`<p>液体里的组织会对阿七的表情作出极慢的模仿。它们像眼睛、耳廓、嘴唇，却没有任何正常人体组织应有的连续结构。</p><p>如果师父真的从谁脸上切下这些东西，切口在哪里？</p>`);render();return}
     if(id==='ledger'){addObs('master_rule');openInfo('面具铺旧工艺账',`<p>每张可长期佩戴的面具都需要三类痕迹：</p><div class="paper-grid"><div class="paper-card"><h4>相貌</h4><p>某个人留下的形状，不允许凭想象补齐。</p></div><div class="paper-card"><h4>习惯</h4><p>一个反复做过、足够稳定的动作。</p></div><div class="paper-card"><h4>见证</h4><p>另一件东西证明这段关系确实发生过。</p></div></div>`);render();return}
     if(id==='halfmask'){addItem('halfmask','微笑面具半成品','师父留下的相貌痕迹');toast('取得：微笑面具半成品','good');render();return}
@@ -623,6 +658,20 @@
     state.hiddenEnding=true;save();app.innerHTML=`<section class="ending-screen"><div class="ending-inner"><div class="subtitle">HIDDEN EPILOGUE</div><h1>木头记得</h1><div class="ending-prose"><p>阿七回头时，门没有立刻打开。</p><p>工作台的黑线自己松开；小灯亮了一下；椅子向桌下退回半寸；水壶里传来很轻的水声。</p><p>门板敲了三下。不是敲门，是师父量木头时的节奏。</p><p>阿七问：“你还在吗？”</p><p>房间里七个不同的位置依次发出熟悉的响声。</p><p>很久以后，一句话从木头里传出来：“这双手不在了，但有些木头记得。”</p><p>它没有说明师父是否真的变成了铺子。海里仍有一张没有主人的空白面具漂向岸边。</p></div><div class="ending-actions"><button class="ink-btn" data-hidden-title>返回标题</button></div></div></section>`;document.querySelector('[data-hidden-title]').onclick=()=>{state.started=false;state.scene='title';save();render()};
   }
 
+  function openNotebook(tab='obs'){
+    sideTab=tab;
+    const tabNames={items:'物件',obs:'观察',masks:'面具'};
+    modal(`<div class="notebook-head"><div class="kicker">阿七的观察簿</div><h2>${tabNames[sideTab]}</h2></div><div class="notebook-tabs"><button class="tab-btn ${sideTab==='obs'?'active':''}" data-book-tab="obs">观察</button><button class="tab-btn ${sideTab==='items'?'active':''}" data-book-tab="items">物件</button><button class="tab-btn ${sideTab==='masks'?'active':''}" data-book-tab="masks">面具</button></div><div class="notebook-body">${sideTabContent()}</div>`,{dark:false,wide:true,close:true,classes:'notebook-modal'});
+    document.querySelectorAll('[data-book-tab]').forEach(b=>b.onclick=()=>openNotebook(b.dataset.bookTab));
+    document.querySelectorAll('[data-obs]').forEach(c=>c.onclick=()=>{toggleObs(c.dataset.obs);openNotebook('obs')});
+    document.querySelector('[data-connect]')?.addEventListener('click',()=>{connectSelectedObs();openNotebook('obs')});
+    document.querySelectorAll('[data-mask]').forEach(c=>c.onclick=()=>{const id=c.dataset.mask;if(c.classList.contains('locked'))return;closeModal();openMask(id)});
+  }
+
+  function openSupport(){
+    modal(`<div class="support-panel"><div class="support-mark">￥</div><h2>支持作者</h2><p>完整游戏、提示与全部结局始终免费。这个入口只用于自愿支持，不参与章节解锁，也不会改变任何谜题结果。</p><p class="muted small">当前仓库没有绑定支付二维码或第三方支付接口，因此本版本只保留统一的支持入口与界面位置，避免伪造收款信息。</p></div>`,{dark:false,narrow:true,close:true,classes:'support-modal'});
+  }
+
   function openHint(){
     const key=state.scene+'-'+currentChapterLabel();const level=(state.hints[key]||0);const hints=getHints();const shown=hints[Math.min(level,hints.length-1)];
     modal(`<div class="kicker">渐进帮助 · ${Math.min(level+1,3)}/3</div><h2>只把你带回规则</h2><p class="lead">${esc(shown)}</p><p class="muted small">第一层重述异常规则；第二层指出还没核对的证据类别；第三层只显示一个可尝试的动作，不直接告诉结果。</p><div class="modal-actions"><button class="ghost-btn" id="hint-next" ${level>=2?'disabled':''}>再具体一点</button></div>`,{dark:true,narrow:true,close:true});
@@ -645,8 +694,10 @@
   }
 
   function openSettings(){
-    modal(`<div class="kicker">设置</div><h2>阅读与操作</h2><div class="paper-grid"><button class="paper-card mask-btn" id="set-audio"><h4>声音</h4><p>${state.audio?'当前开启':'当前关闭'}。声音谜题始终保留视觉声纹模式。</p></button><button class="paper-card mask-btn" id="set-motion"><h4>减少动态</h4><p>${state.reduced?'当前开启':'当前跟随系统偏好'}。关闭大幅镜面与呼吸动效。</p></button></div><p class="muted small">所有拖拽类操作都有点击/滑杆替代；颜色不是唯一线索；逐字文本不会强制等待。</p>`,{dark:true,narrow:true,close:true});
-    document.getElementById('set-audio').onclick=()=>{state.audio=!state.audio;save();syncAmbience();closeModal();openSettings()};document.getElementById('set-motion').onclick=()=>{state.reduced=!state.reduced;save();document.documentElement.classList.toggle('reduce-motion',state.reduced);closeModal();openSettings()};
+    modal(`<div class="kicker">设置</div><h2>阅读与操作</h2><div class="paper-grid"><button class="paper-card mask-btn" id="set-audio"><h4>声音</h4><p>${state.audio?'当前开启':'当前关闭'}。声音谜题始终保留视觉声纹模式。</p></button><button class="paper-card mask-btn" id="set-motion"><h4>减少动态</h4><p>${state.reduced?'当前开启':'当前跟随系统偏好'}。关闭大幅镜面与呼吸动效。</p></button><button class="paper-card mask-btn" id="set-hotspots"><h4>辅助热点</h4><p>${state.hotspotAssist?'当前显示':'默认隐藏'}。开启后常驻显示可检查物件名称，适合触屏或无障碍使用。</p></button></div><p class="muted small">PC可直接拖动物品；平板和手机既可拖拽，也可先点物品再点场景。颜色不是唯一线索。</p>`,{dark:false,narrow:true,close:true});
+    document.getElementById('set-audio').onclick=()=>{state.audio=!state.audio;save();syncAmbience();closeModal();openSettings()};
+    document.getElementById('set-motion').onclick=()=>{state.reduced=!state.reduced;save();document.documentElement.classList.toggle('reduce-motion',state.reduced);closeModal();openSettings()};
+    document.getElementById('set-hotspots').onclick=()=>{state.hotspotAssist=!state.hotspotAssist;save();closeModal();openSettings()};
   }
 
   function openInfo(title,html,onClose){modal(`<div class="kicker">卷宗边页</div><h2>${title}</h2>${html}`,{dark:true,wide:false,close:true,onClose})}
@@ -665,12 +716,15 @@
   function closeModal(clear=true){if(clear)modalRoot.innerHTML='';else modalRoot.innerHTML=''}
   function esc(s){return String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]))}
 
-  // Keyboard comfort: Escape closes non-critical modals, M toggles drawer, N opens observations.
+  // Keyboard comfort: Escape closes a modal or puts down the held item; N opens the observation notebook.
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape'){const c=modalRoot.querySelector('.modal-close');if(c)c.click()}
+    if(e.key==='Escape'){
+      const c=modalRoot.querySelector('.modal-close');
+      if(c){c.click();return}
+      if(heldItemId){heldItemId=null;render();return}
+    }
     if(!state.started)return;
-    if(e.key.toLowerCase()==='n'){sideTab='obs';render();setTimeout(()=>document.getElementById('side-panel')?.classList.add('open'),0)}
-    if(e.key.toLowerCase()==='m')document.getElementById('side-panel')?.classList.toggle('open');
+    if(e.key.toLowerCase()==='n')openNotebook('obs');
   });
   window.addEventListener('beforeunload',save);
   window.addEventListener('pageshow',()=>{normalizeState();render()});
