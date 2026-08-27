@@ -1,15 +1,20 @@
 (() => {
   'use strict';
 
-  const VERSION = 5;
-  const ASSET_REV = '?v=clean5';
-  const SAVE_KEY = 'mianmu-the-face-of-it-save-v5';
-  const META_KEY = 'mianmu-the-face-of-it-meta-v5';
-  const LEGACY_SAVE_KEYS = ['mianmu-the-face-of-it-save-v4','mianmu-the-face-of-it-save-v3'];
-  const LEGACY_META_KEYS = ['mianmu-the-face-of-it-meta-v4','mianmu-the-face-of-it-meta-v3'];
+  const VERSION = 6;
+  const ASSET_REV = '?v=story6';
+  const SAVE_KEY = 'mianmu-the-face-of-it-save-v6';
+  const META_KEY = 'mianmu-the-face-of-it-meta-v6';
+  const LEGACY_SAVE_KEYS = ['mianmu-the-face-of-it-save-v5','mianmu-the-face-of-it-save-v4','mianmu-the-face-of-it-save-v3'];
+  const LEGACY_META_KEYS = ['mianmu-the-face-of-it-meta-v5','mianmu-the-face-of-it-meta-v4','mianmu-the-face-of-it-meta-v3'];
   const app = document.getElementById('app');
   const modalRoot = document.getElementById('modal-root');
   const toastRoot = document.getElementById('toast-root');
+  const SUPPORT_STORAGE_KEY = '_mianmu_face_support';
+  const SUPPORT_SESSION_KEY = '_mianmu_face_session';
+  const SUPPORT_COOKIE_KEY = '_mianmu_pay_flag';
+  const SUPPORT_AUTO_KEY = '_mianmu_support_auto_seen';
+  const SUPPORT_QR = 'https://mike798-cloud.github.io/songtao-grainstation/paycode.png';
   const audios = {
     sea: document.getElementById('amb-sea'),
     shop: document.getElementById('amb-shop'),
@@ -37,6 +42,24 @@
     {id:'stitch', title:'新线', text:'微笑面具内侧多了一根新线，针脚不是阿七留下的。'},
     {id:'door', title:'门板', text:'夜里门板发出三下敲木料的节奏——师父量木头时总这么敲。'},
     {id:'dollchip', title:'木屑', text:'无脸瓷娃娃旁出现一小片新木屑，与童年刻痕处的材质相同。'}
+  ];
+
+  const MASK_EPILOGUES = {
+    mayor:['奥斯文摘下面具时，讲台后那面墙仍旧平整。','只有抽屉里的一封辞职信，比所有奖状更像他的脸。','阿七把鼻梁残响收进布袋，没有替他说完那句话。'],
+    butcher:['第六只盘子被收走以后，第七把椅子还留在原地。','格伦把围裙叠得像一封正式公文，坐下时没有人鼓掌。','屋里第一次没有谁负责送别。'],
+    elaine:['镜灯一盏一盏熄灭，十二张脸也跟着退进黑里。','最后留下的不是某一张面孔，而是高音之前那两次短促吸气。','习惯比妆更慢，也比名字活得久。'],
+    milo:['怪物重新变成人时，房间没有因此变安全。','父亲依旧病弱，母亲依旧紧张，镇长依旧在门口换领带。','孩子只是第一次知道：害怕并不会因为看懂而消失。'],
+    postman:['第七封信终于离开手心以后，海边没有发生奇迹。','风仍旧从同一个方向来，邮箱仍旧生锈。','只是那条路第一次允许一个人走到昨天以外。'],
+    soren:['黑暗里最后一圈声纹慢慢散开。','索伦没有说起那张已经记不住的脸，只用指尖碰了碰表盖。','有些人离开以后，房间仍知道他们曾经站在哪里。'],
+    blank:['空白面具没有学会一种新的表情。','它只是把阿七真正选过的一件东西、一条方向，安静地留了下来。','第一次，没有谁替这次选择命名。']
+  };
+
+  const OPENING_LINES = [
+    '海在第七日的清晨总显得比昨天更近。',
+    '雾从七码头爬上石阶，把每扇窗的边缘擦得只剩一层灰。',
+    '阿七回到面具铺时，师父的工作灯还亮着。',
+    '门没有锁。屋里却没有人应声。',
+    '工作台上放着一只没有五官的木盒，椅子向后退了半寸，像有人刚刚起身，却忘了把自己带走。'
   ];
 
   const OBSERVATIONS = {
@@ -105,7 +128,7 @@
       shopChangesAvailable:0, shopChangesSeen:[],
       postmanChoice:null, blankItem:null, blankDirection:null,
       finalUnlocked:false, finalStations:[], finalPairing:{}, motherShown:false, centerSolved:false,
-      ending:null, hiddenEnding:false, hints:{}, mistakes:0, hotspotAssist:false, ngp:!!meta.completed
+      ending:null, hiddenEnding:false, hints:{}, mistakes:0, hotspotAssist:false, introShown:false, ngp:!!meta.completed
     };
   }
 
@@ -177,7 +200,7 @@
           <button class="menu-btn" data-act="settings">设置</button>
           <button class="menu-btn" data-act="credits">制作说明</button>
         </div>
-        <div class="title-version">v5.0 · 场景优先交互 · ${meta.completed?'残响视角已开放':'建议佩戴耳机'}</div>
+        <div class="title-version">v6.0 · 场景交互 / 叙事过场 · ${meta.completed?'残响视角已开放':'建议佩戴耳机'}</div>
       </section>
       <div class="title-whisper">师父的灯还亮着。门没有锁。</div>
     </main>`;
@@ -189,9 +212,9 @@
     if(act==='new'){
       if(storage.getItem(SAVE_KEY) && !confirm('开始新游戏会覆盖当前进度。继续吗？'))return;
       resetSave(); state.started=true; state.startedAt=Date.now(); state.ngp=!!meta.completed; state.scene='shop'; save();
-      playSfx('knock'); render();
-      showStory(['海湾的雾从门缝里进来。','师父的工作灯还亮着，椅子却是空的。','订单簿停在第七日，最后一行只写了半句：','“缺一块就空着，不要替别人长脸。”'],()=>{closeModal();render()});
-    } else if(act==='continue') {state.started=true; if(state.scene==='title')state.scene='shop'; render();}
+      playSfx('knock');
+      showOpeningCinematic();
+    } else if(act==='continue') {state.started=true; if(state.scene==='title')state.scene='shop'; render();setTimeout(scheduleSupportAuto,650);}
     else if(act==='settings') openSettings();
     else if(act==='credits') openInfo('制作说明',`<p>《面目》是一部围绕“脸、面具、接缝、镜子、针线、潮水”构成的超现实网页解谜作品。</p><p>本版本依据 v3.0 制作基准开发：不使用关键词输入，不把主线做成选择题考试；正确方法必须在世界内部拥有可观察依据。</p>`);
     else if(act==='about') openInfo('关于本作',`<p>镇民把面具铺当成裁缝铺、医生和殡仪馆的混合物：敬而远之，却总会有需要它的一天。</p><p>三个异常永远不解释：为什么公共日历没有第八日；窗台无脸瓷娃娃是谁留下的；海里漂来的空白面具属于谁。</p>`);
@@ -351,8 +374,12 @@
       heldItemId=null;removeItem('key');state.prologue.secret=true;state.scene='secret';save();playSfx('knock');render();
       showStory(['黑铁片滑进墙缝，几乎没有阻力。','整块木板向里退开。','潮湿石墙后排列着七只玻璃罐。'],()=>{closeModal();render()});return;
     }
+    if(item==='scissors'&&target==='mirror'){heldItemId=null;discoverFeature('scissors');toast('剪刀的窄反光掠过木盒，鼻梁只在镜中成立。','good');return}
     if(['halfmask','blackthread','woodchip'].includes(item)&&target==='craft'){heldItemId=null;openCraftPuzzle();return}
     const reactions={
+      'scissors:doll':'刀刃靠近瓷娃娃时，它没有躲。阿七反而先把剪刀放低了。',
+      'scissors:box':'刀尖碰到木盒接缝，里面没有机关响，只在镜中多出一道像鼻梁的冷光。',
+      'scissors:chair':'椅背木头很旧，但没有值得剪开的东西。',
       'key:box':'木盒没有钥匙孔。黑铁靠近时，镜中的盒面反而更像阿七。',
       'key:jars':'钥匙贴近玻璃，罐中组织缓慢模仿了一次握钥匙的动作。',
       'blackthread:jars':'黑线靠近玻璃后微微绷紧，像有人从另一端拉了一下。',
@@ -389,7 +416,8 @@
 
   function hotAction(id){
     if(id==='returnshop'){state.scene='shop';state.currentMask=null;save();render();return}
-    if(['mirror','lamp','doll','scissors','chair'].includes(id)){discoverFeature(id);return}
+    if(['mirror','lamp','doll','chair'].includes(id)){discoverFeature(id);return}
+    if(id==='scissors'){if(!state.inventory.some(x=>x.id==='scissors')){addItem('scissors','裁布剪','师父常用的旧剪刀，刀身能留下很窄的反光。');toast('取得：裁布剪','good');render()}else toast('裁布剪已经在物品栏里。');return}
     if(id==='box'){openBoxPuzzle();return}
     if(id==='darkdoor'){toast(state.inventory.some(x=>x.id==='key')?'墙缝里有一道刚好容得下黑铁片的窄槽。试着把钥匙拖过去。':'木板后像有空腔，但这里没有普通锁孔。');return}
     if(id==='jars'){addObs('jars');openInfo('七只保存罐',`<p>液体里的组织会对阿七的表情作出极慢的模仿。它们像眼睛、耳廓、嘴唇，却没有任何正常人体组织应有的连续结构。</p><p>如果师父真的从谁脸上切下这些东西，切口在哪里？</p>`);render();return}
@@ -442,7 +470,7 @@
     if(state.prologue.water){openInfo('已经倒回第三声钟响',`<p>雾气上留下半句：“不要替他——”。后面的字被水抹走了。</p>`);return}
     modal(`<div class="kicker">第一章 · 水底记忆</div><h2>让唯一不倒流的东西也倒流</h2><p class="lead">这里没有倒计时。你可以慢慢观察：海水、烛泪、碎玻璃、床单都在回到更早的位置。墙钟没有。</p><div class="puzzle-board"><div class="puzzle-visual" style="background-image:url('assets/images/water-memory.webp${ASSET_REV}')"><div class="clock-wrap"><div class="clock-face"><div class="clock-hand" id="clock-hand" style="--angle:90deg"></div><div class="clock-pin"></div></div></div></div><div class="puzzle-panel"><div class="paper-card"><h4>观察</h4><p>顺时针不会发生任何事。逆时针时，房间的水声会变得更近，像时间被从墙里抽出来。</p></div><label class="paper-card"><h4>逆时针拨钟</h4><input id="reverse-range" class="range-wide" type="range" min="0" max="100" value="0"><p>持续拨回去，直到第三声钟响。</p></label><div id="water-feedback" class="feedback">墙钟仍在向前。</div></div></div>`,{dark:true,wide:true,close:true});
     const r=document.getElementById('reverse-range'),hand=document.getElementById('clock-hand'),fb=document.getElementById('water-feedback');
-    r.oninput=()=>{const v=Number(r.value);hand.style.setProperty('--angle',(90-v*4.8)+'deg');if(v>25){playSfx('clock');fb.textContent='第一声：床单褶皱消失，碎玻璃回到镜框。'}if(v>52)fb.textContent='第二声：水线从墙脚退回天花板。';if(v>=83&&!state.prologue.water){state.prologue.water=true;state.chapter2Unlocked=true;state.chapter=2;state.scene='shop';addObs('water_reverse','mother_note');addHabit('触到针线时先检查有没有死结');save();fb.className='feedback ok';fb.innerHTML='<b>第三声。</b> 镜子起雾。女人怀里抱着没有稳定左半脸的婴儿，手指写下：“不要替他——”。后半句没有出现。';setTimeout(()=>{closeModal();render();showStory(['师父的记忆没有解释七只玻璃罐。','墙上的订单却多出了五个仍然活在镇上的名字。','如果他们真的被取走了脸的一部分——','他们为什么还在照常生活？'],()=>{closeModal();render()})},1300)}};
+    r.oninput=()=>{const v=Number(r.value);hand.style.setProperty('--angle',(90-v*4.8)+'deg');if(v>25){playSfx('clock');fb.textContent='第一声：床单褶皱消失，碎玻璃回到镜框。'}if(v>52)fb.textContent='第二声：水线从墙脚退回天花板。';if(v>=83&&!state.prologue.water){state.prologue.water=true;state.chapter2Unlocked=true;state.chapter=2;state.scene='shop';addObs('water_reverse','mother_note');addHabit('触到针线时先检查有没有死结');save();fb.className='feedback ok';fb.innerHTML='<b>第三声。</b> 镜子起雾。女人怀里抱着没有稳定左半脸的婴儿，手指写下：“不要替他——”。后半句没有出现。';setTimeout(()=>{closeModal();showCinematic({image:'water-memory.webp',kicker:'第一章结束 · 水退回墙里',lines:['第三声钟响之后，水雾把那半句字慢慢吞回去。','师父的记忆没有解释七只玻璃罐。','墙上的订单却多出了五个仍然活在镇上的名字。','如果他们真的被取走了脸的一部分——','他们为什么还在照常生活？'],onDone:()=>{render();setTimeout(scheduleSupportAuto,700)},mode:'water'})},1300)}};
   }
 
   function openMaskWall(){
@@ -463,16 +491,16 @@
     state.shopChangesAvailable=Math.min(7,state.shopChangesAvailable+1);
     state.scene='shop'; state.currentMask=null; save();
     playSfx('glass'); toast(`获得残响：${residueLabel}`,'good');
-    closeModal();render();
+    closeModal();
     const n=completedMain();
-    if(MAIN_MASKS.includes(id) && (n===2||n===4))showShopInterlude(n);
-    if(MAIN_MASKS.includes(id) && n===3)toast('门铃响了一次。门外没有人，只留下一张盲眼老人的名片。');
-    if(MAIN_MASKS.includes(id) && n===5)addObs('six_functions');
+    const finish=()=>{render();if(MAIN_MASKS.includes(id) && (n===2||n===4))setTimeout(()=>showShopInterlude(n),260);if(MAIN_MASKS.includes(id) && n===3)toast('门铃响了一次。门外没有人，只留下一张盲眼老人的名片。');if(MAIN_MASKS.includes(id) && n===5)addObs('six_functions')};
+    const lines=MASK_EPILOGUES[id];
+    if(lines)showCinematic({image:MASK_META[id]?.image||'mask-shop.webp',kicker:'残响归档',lines,onDone:finish,mode:'memory'});else finish();
   }
 
   function showShopInterlude(n){
     const lines=n===2?['第二张面具挂回墙上。','阿七伸手去拿杯子，却先把杯柄转向了右边。','这不是他的习惯。','镜子里的手慢了一拍才跟上。']:['第四张面具以后，铺子没有立刻恢复安静。','墙上的五张旧肖像短暂换成了不同人的脸。','阿七闭眼时，却还能知道门在哪里。','有些习惯已经不需要面具才能出现。'];
-    showStory(lines,()=>{closeModal();render()});
+    showCinematic({image:'mask-shop.webp',kicker:n===2?'中场 · 第二张面具之后':'中场 · 第四张面具之后',lines,onDone:()=>{render()},mode:'shop'});
   }
 
   function openMayor(){
@@ -501,10 +529,10 @@
     ];
     const seats=[['s1','黑面包 · 靠窗'],['s2','牛奶 · 远离烛台'],['s3','燕麦 · 17号右侧'],['s4','苹果 · 最旧名牌'],['s5','盐土豆 · 面向门'],['s6','胡萝卜 · 靠墙']];
     let chosen=null,assign={};
-    modal(`<div class="kicker">屠夫 · 格伦</div><h2>七个位子，只有六份档案</h2><p class="lead">格伦把每次屠宰都办成正式送别。档案不是密码，它们记录真实习惯：食物、声音恐惧、座位偏好。</p><div class="puzzle-board"><div class="puzzle-visual" style="background-image:url('assets/images/butcher.webp${ASSET_REV}')"></div><div class="puzzle-panel"><div class="pig-roster">${pigs.map(p=>`<button class="pig-card" data-pig="${p.id}"><b>${p.name}</b><br>${p.log}</button>`).join('')}</div><div class="seat-grid">${seats.map(s=>`<button class="seat" data-seat="${s[0]}"><b>${s[1]}</b><span>空位</span></button>`).join('')}</div><div id="butcher-feedback" class="feedback">先选一份档案，再点一个座位。错误座位上的猪会拒绝进食，并保留提示。</div><button class="ink-btn" id="butcher-check">核对送别宴</button></div></div>`,{dark:true,wide:true,close:true});
+    modal(`<div class="kicker">屠夫 · 格伦</div><h2>七个位子，只有六份档案</h2><p class="lead">格伦把每次屠宰都办成正式送别。档案不是密码，它们记录真实习惯：食物、声音恐惧、座位偏好。</p><div class="puzzle-board"><div class="puzzle-visual" style="background-image:url('assets/images/butcher.webp${ASSET_REV}')"></div><div class="puzzle-panel"><div class="pig-roster">${pigs.map(p=>`<button class="pig-card" draggable="true" data-pig="${p.id}"><b>${p.name}</b><br>${p.log}</button>`).join('')}</div><div class="seat-grid">${seats.map(s=>`<button class="seat" data-seat="${s[0]}"><b>${s[1]}</b><span>空位</span></button>`).join('')}</div><div id="butcher-feedback" class="feedback">先选一份档案，再点一个座位。错误座位上的猪会拒绝进食，并保留提示。</div><button class="ink-btn" id="butcher-check">核对送别宴</button></div></div>`,{dark:true,wide:true,close:true});
     const refresh=()=>{document.querySelectorAll('[data-pig]').forEach(b=>{b.classList.toggle('selected',b.dataset.pig===chosen);b.classList.toggle('used',Object.values(assign).includes(b.dataset.pig))});document.querySelectorAll('[data-seat]').forEach(b=>{const p=assign[b.dataset.seat];b.classList.toggle('filled',!!p);b.querySelector('span').textContent=p?pigs.find(x=>x.id===p).name:'空位'})};
-    document.querySelectorAll('[data-pig]').forEach(b=>b.onclick=()=>{if(Object.values(assign).includes(b.dataset.pig))return;chosen=b.dataset.pig;refresh()});
-    document.querySelectorAll('[data-seat]').forEach(b=>b.onclick=()=>{if(!chosen){const old=assign[b.dataset.seat];if(old){delete assign[b.dataset.seat];refresh()}return}assign[b.dataset.seat]=chosen;chosen=null;refresh()});
+    document.querySelectorAll('[data-pig]').forEach(b=>{b.onclick=()=>{if(Object.values(assign).includes(b.dataset.pig))return;chosen=b.dataset.pig;refresh()};b.addEventListener('dragstart',e=>{if(Object.values(assign).includes(b.dataset.pig)){e.preventDefault();return}e.dataTransfer?.setData('text/plain',b.dataset.pig);b.classList.add('selected')});b.addEventListener('dragend',()=>b.classList.remove('selected'))});
+    document.querySelectorAll('[data-seat]').forEach(b=>{b.onclick=()=>{if(!chosen){const old=assign[b.dataset.seat];if(old){delete assign[b.dataset.seat];refresh()}return}assign[b.dataset.seat]=chosen;chosen=null;refresh()};b.addEventListener('dragover',e=>{e.preventDefault();b.classList.add('drop-ready')});b.addEventListener('dragleave',()=>b.classList.remove('drop-ready'));b.addEventListener('drop',e=>{e.preventDefault();b.classList.remove('drop-ready');const pig=e.dataTransfer?.getData('text/plain');if(!pig)return;assign[b.dataset.seat]=pig;chosen=null;refresh()})});
     document.getElementById('butcher-check').onclick=()=>{const fb=document.getElementById('butcher-feedback');let wrong=[];for(const p of pigs)if(assign[p.seat]!==p.id)wrong.push(p);if(!wrong.length){fb.className='feedback ok';fb.innerHTML='<b>六头猪都开始进食。</b> 第七把一直没有编号的椅子缓慢转向格伦。他脱下围裙坐下，菜单翻面：送行者。';setTimeout(()=>completeMask('butcher','res_yan','言 · 嘴唇',['butcher_six','butcher_sender'],'说完一句话以后会等对方真正回应'),1000)}else{state.mistakes++;save();fb.className='feedback bad';const p=wrong[0];fb.textContent=`${p.name}拒绝了面前的食物。档案里的“${p.log}”至少有一项和这个座位不符。`}};
   }
 
@@ -527,10 +555,10 @@
     const monsters=[['bull','牛头父亲','反复撞门'],['cat','猫首母亲','不停舔爪'],['snake','蛇身镇长','进门前不断蜕皮']];
     const objects=[['cane','门框旁的旧手杖','父亲腿疼，起身会扶门框'],['cloth','湿布','母亲紧张时反复擦手'],['badge','备用徽章与领带','镇长每次进门前更换身份标记']];
     const correct={bull:'cane',cat:'cloth',snake:'badge'}; let left=null,right=null,pairs={};
-    modal(`<div class="kicker">鞋匠之子 · 米罗</div><h2>让怪物短暂变回人</h2><p class="lead">这些怪物不是昵称谜语。孩子把成人重复行为重新解释成兽形；现实物件仍留在原来的面具铺位置。</p><div class="puzzle-board"><div class="puzzle-visual" style="background-image:url('assets/images/milo.webp${ASSET_REV}')"></div><div class="puzzle-panel"><div class="match-grid"><div class="match-col">${monsters.map(x=>`<button class="match-btn" data-mon="${x[0]}"><b>${x[1]}</b><br><span class="muted">${x[2]}</span></button>`).join('')}</div><div class="match-arrow">↔</div><div class="match-col">${objects.map(x=>`<button class="match-btn" data-obj="${x[0]}"><b>${x[1]}</b><br><span class="muted">${x[2]}</span></button>`).join('')}</div></div><div class="pair-log" id="milo-pairs"></div><div id="milo-feedback" class="feedback">点一个怪物，再点一个现实物件。</div><button class="ink-btn" id="milo-check">检查三组对应</button></div></div>`,{dark:true,wide:true,close:true});
+    modal(`<div class="kicker">鞋匠之子 · 米罗</div><h2>让怪物短暂变回人</h2><p class="lead">这些怪物不是昵称谜语。孩子把成人重复行为重新解释成兽形；现实物件仍留在原来的面具铺位置。</p><div class="puzzle-board"><div class="puzzle-visual" style="background-image:url('assets/images/milo.webp${ASSET_REV}')"></div><div class="puzzle-panel"><div class="match-grid"><div class="match-col">${monsters.map(x=>`<button class="match-btn monster-drop" data-mon="${x[0]}"><b>${x[1]}</b><br><span class="muted">${x[2]}</span></button>`).join('')}</div><div class="match-arrow">↔</div><div class="match-col">${objects.map(x=>`<button class="match-btn" draggable="true" data-obj="${x[0]}"><b>${x[1]}</b><br><span class="muted">${x[2]}</span></button>`).join('')}</div></div><div class="pair-log" id="milo-pairs"></div><div id="milo-feedback" class="feedback">点一个怪物，再点一个现实物件。</div><button class="ink-btn" id="milo-check">检查三组对应</button></div></div>`,{dark:true,wide:true,close:true});
     const refresh=()=>{document.querySelectorAll('[data-mon]').forEach(b=>b.classList.toggle('selected',b.dataset.mon===left));document.querySelectorAll('[data-obj]').forEach(b=>b.classList.toggle('selected',b.dataset.obj===right));document.getElementById('milo-pairs').innerHTML=Object.entries(pairs).map(([m,o])=>`<div class="pair-row">${monsters.find(x=>x[0]===m)[1]} ↔ ${objects.find(x=>x[0]===o)[1]}</div>`).join('')};
     const maybe=()=>{if(left&&right){pairs[left]=right;left=right=null;refresh()}};
-    document.querySelectorAll('[data-mon]').forEach(b=>b.onclick=()=>{left=b.dataset.mon;refresh();maybe()});document.querySelectorAll('[data-obj]').forEach(b=>b.onclick=()=>{right=b.dataset.obj;refresh();maybe()});
+    document.querySelectorAll('[data-mon]').forEach(b=>{b.onclick=()=>{left=b.dataset.mon;refresh();maybe()};b.addEventListener('dragover',e=>{e.preventDefault();b.classList.add('drop-ready')});b.addEventListener('dragleave',()=>b.classList.remove('drop-ready'));b.addEventListener('drop',e=>{e.preventDefault();b.classList.remove('drop-ready');const obj=e.dataTransfer?.getData('text/plain');if(!obj)return;pairs[b.dataset.mon]=obj;left=right=null;refresh()})});document.querySelectorAll('[data-obj]').forEach(b=>{b.onclick=()=>{right=b.dataset.obj;refresh();maybe()};b.addEventListener('dragstart',e=>{e.dataTransfer?.setData('text/plain',b.dataset.obj);b.classList.add('selected')});b.addEventListener('dragend',()=>b.classList.remove('selected'))});
     document.getElementById('milo-check').onclick=()=>{const fb=document.getElementById('milo-feedback');const ok=Object.entries(correct).every(([m,o])=>pairs[m]===o);if(ok){fb.className='feedback ok';fb.innerHTML='<b>三只怪物短暂变回成人。</b> 父亲没有康复，只是坐下来喘气。米罗真正害怕的，是有一天这头“怪物”再也不会回来。';setTimeout(()=>completeMask('milo','res_jian','见 · 眼睛',['milo_monster','milo_fear'],'重新看同一个物件时会确认它有没有变成别的东西'),1000)}else{state.mistakes++;save();const wrong=Object.keys(correct).find(m=>pairs[m]&&pairs[m]!==correct[m]);fb.className='feedback bad';fb.textContent=wrong?`${monsters.find(x=>x[0]===wrong)[1]}没有恢复人形。它的动作与所选现实物件不是同一种重复行为。`:'还有怪物没有找到现实动作来源。'}};
   }
 
@@ -628,7 +656,7 @@
   }
 
   function showFinalTruth(){
-    showStory(['师父没有算错。','六种残响确实能让阿七成为一个非常稳定的人。','他错的是另一件事：把“能替你完成”，误当成“有权替你完成”。','左半脸的黑色区域并不是别人脸之间的缝。','那是出生时唯一没有被任何人固定的皮肤。'],()=>{closeModal();openEndChoice()});
+    showCinematic({image:'finale.webp',kicker:'终章 · 面目',lines:['师父没有算错。','六种残响确实能让阿七成为一个非常稳定的人。','他错的是另一件事：把“能替你完成”，误当成“有权替你完成”。','左半脸的黑色区域并不是别人脸之间的缝。','那是出生时唯一没有被任何人固定的皮肤。'],onDone:()=>openEndChoice(),mode:'finale'});
   }
 
   function openEndChoice(){
@@ -643,8 +671,8 @@
       faceless:['无面','阿七把能卸下的稳定组织一块块放回玻璃罐。镇上的人开始认不出他。','但有人在门外听到针线声，仍会说：“阿七今天在。”'],
       close:['关闭','面具铺的招牌被拆下来。第一个月有人骂他，第二个月有人偷偷来问旧面具还能不能修。','改变没有像结局动画一样发生。它只是终于允许发生。']
     }[type];
-    app.innerHTML=`<section class="ending-screen"><div class="ending-inner"><div class="subtitle">ENDING</div><h1>${text[0]}</h1><div class="ending-prose"><p>${text[1]}</p><p>${text[2]}</p><p>${personalLine()}</p><p>海湾的公共日历翻了一页。上面仍然写着：第七日。</p></div><div class="ending-actions"><button class="ink-btn" data-end-act="title">返回标题</button><button class="ghost-btn" data-end-act="ngp">以残响视角开始二周目</button>${hiddenEligible()?'<button class="ghost-btn" data-end-act="hidden">回头听铺子</button>':''}</div></div></section>`;
-    document.querySelectorAll('[data-end-act]').forEach(b=>b.onclick=()=>{if(b.dataset.endAct==='title'){state.started=false;state.scene='title';save();render()}else if(b.dataset.endAct==='ngp'){resetSave();state.started=true;state.ngp=true;state.scene='shop';save();render();toast('二周目：残响视角已开启。','good')}else openHiddenEnding()});
+    const drawEnding=()=>{app.innerHTML=`<section class="ending-screen ending-illustrated" style="--ending-bg:url('assets/images/${type==='close'?'coast-house.webp':'mask-shop.webp'}${ASSET_REV}')"><div class="ending-shade"></div><div class="ending-inner"><div class="subtitle">ENDING</div><h1>${text[0]}</h1><div class="ending-prose"><p>${text[1]}</p><p>${text[2]}</p><p>${personalLine()}</p><p>海湾的公共日历翻了一页。上面仍然写着：第七日。</p></div><div class="ending-actions"><button class="ink-btn" data-end-act="title">返回标题</button><button class="ghost-btn" data-end-act="ngp">以残响视角开始二周目</button>${hiddenEligible()?'<button class="ghost-btn" data-end-act="hidden">回头听铺子</button>':''}</div></div></section>`;document.querySelectorAll('[data-end-act]').forEach(b=>b.onclick=()=>{if(b.dataset.endAct==='title'){state.started=false;state.scene='title';save();render()}else if(b.dataset.endAct==='ngp'){resetSave();state.started=true;state.ngp=true;state.scene='shop';save();showOpeningCinematic(true)}else openHiddenEnding()})};
+    showCinematic({image:type==='close'?'coast-house.webp':'mask-shop.webp',kicker:`结局 · ${text[0]}`,lines:[text[1],text[2],personalLine(),'海湾的公共日历翻了一页。上面仍然写着：第七日。'],onDone:drawEnding,mode:'ending'});
   }
 
   function personalLine(){
@@ -655,7 +683,9 @@
 
   function hiddenEligible(){return state.shopChangesSeen.length>=5 && hasMask('soren') && hasMask('blank')}
   function openHiddenEnding(){
-    state.hiddenEnding=true;save();app.innerHTML=`<section class="ending-screen"><div class="ending-inner"><div class="subtitle">HIDDEN EPILOGUE</div><h1>木头记得</h1><div class="ending-prose"><p>阿七回头时，门没有立刻打开。</p><p>工作台的黑线自己松开；小灯亮了一下；椅子向桌下退回半寸；水壶里传来很轻的水声。</p><p>门板敲了三下。不是敲门，是师父量木头时的节奏。</p><p>阿七问：“你还在吗？”</p><p>房间里七个不同的位置依次发出熟悉的响声。</p><p>很久以后，一句话从木头里传出来：“这双手不在了，但有些木头记得。”</p><p>它没有说明师父是否真的变成了铺子。海里仍有一张没有主人的空白面具漂向岸边。</p></div><div class="ending-actions"><button class="ink-btn" data-hidden-title>返回标题</button></div></div></section>`;document.querySelector('[data-hidden-title]').onclick=()=>{state.started=false;state.scene='title';save();render()};
+    state.hiddenEnding=true;save();
+    const lines=['阿七回头时，门没有立刻打开。','工作台的黑线自己松开；小灯亮了一下；椅子向桌下退回半寸。','门板敲了三下。不是敲门，是师父量木头时的节奏。','阿七问：“你还在吗？”','很久以后，一句话从木头里传出来：“这双手不在了，但有些木头记得。”'];
+    showCinematic({image:'mask-shop.webp',kicker:'隐藏尾声 · 木头记得',lines,onDone:()=>{app.innerHTML=`<section class="ending-screen ending-illustrated" style="--ending-bg:url('assets/images/mask-shop.webp${ASSET_REV}')"><div class="ending-shade"></div><div class="ending-inner"><div class="subtitle">HIDDEN EPILOGUE</div><h1>木头记得</h1><div class="ending-prose"><p>房间里七个不同的位置依次发出熟悉的响声。</p><p>它没有说明师父是否真的变成了铺子。</p><p>海里仍有一张没有主人的空白面具漂向岸边。那张面具没有朝向任何人。</p></div><div class="ending-actions"><button class="ink-btn" data-hidden-title>返回标题</button></div></div></section>`;document.querySelector('[data-hidden-title]').onclick=()=>{state.started=false;state.scene='title';save();render()}},mode:'ending'});
   }
 
   function openNotebook(tab='obs'){
@@ -669,8 +699,31 @@
   }
 
   function openSupport(){
-    modal(`<div class="support-panel"><div class="support-mark">￥</div><h2>支持作者</h2><p>完整游戏、提示与全部结局始终免费。这个入口只用于自愿支持，不参与章节解锁，也不会改变任何谜题结果。</p><p class="muted small">当前仓库没有绑定支付二维码或第三方支付接口，因此本版本只保留统一的支持入口与界面位置，避免伪造收款信息。</p></div>`,{dark:false,narrow:true,close:true,classes:'support-modal'});
+    showPaywall(false);
   }
+
+  function supportHasPaid(){
+    try{return !!(localStorage.getItem(SUPPORT_STORAGE_KEY)||sessionStorage.getItem(SUPPORT_SESSION_KEY)||getCookie(SUPPORT_COOKIE_KEY))}catch(_){return false}
+  }
+  function setSupportPaid(){
+    const token=btoa(`${Date.now()}_${Math.random().toString(36).slice(2,10)}_abc_studio`);
+    try{localStorage.setItem(SUPPORT_STORAGE_KEY,token);sessionStorage.setItem(SUPPORT_SESSION_KEY,token);setCookie(SUPPORT_COOKIE_KEY,token,365)}catch(_){}
+  }
+  function setCookie(name,value,days){try{const d=new Date();d.setTime(d.getTime()+days*86400000);document.cookie=`${name}=${value};expires=${d.toUTCString()};path=/`}catch(_){}}
+  function getCookie(name){try{const p=name+'=';for(const chunk of document.cookie.split(';')){const c=chunk.trim();if(c.startsWith(p))return c.slice(p.length)}}catch(_){}return ''}
+  function scheduleSupportAuto(){
+    try{if(localStorage.getItem(SUPPORT_AUTO_KEY))return;localStorage.setItem(SUPPORT_AUTO_KEY,'1')}catch(_){}
+    setTimeout(()=>showPaywall(true),850);
+  }
+  function showPaywall(auto=false){
+    if(supportHasPaid()){if(!auto)toast('已经记录过你的支持，谢谢你。','good');return}
+    document.getElementById('paywall-overlay')?.remove();
+    const html=`<div class="paywall-overlay" id="paywall-overlay"><div class="paywall-card"><button class="paywall-close" data-pay-close title="关闭">×</button><div class="paywall-card-inner"><div class="paywall-header"><div class="paywall-title-row"><span class="paywall-heart">♡</span><span class="paywall-title">支持《面目》</span><span class="paywall-heart">♡</span></div><div class="paywall-subtitle">1元 自愿打赏 · 完整内容始终免费</div></div><div class="paywall-body"><div class="paywall-qr-wrapper"><img src="${SUPPORT_QR}" alt="收款码" class="paywall-qr-img"><div class="paywall-qr-glow"></div></div><div class="paywall-qr-tip">请用 <strong style="color:#1677ff">某宝</strong> 扫码打赏 1元</div><div class="paywall-message"><p class="paywall-msg-warm">你好，我是 abc studio 的独立开发者。</p><p class="paywall-msg-body">《面目》里每一张脸、每一段记忆和每一个异常动作，都经过反复拆掉再重做。<br>如果你愿意支持 <strong>1元</strong>，它会变成下一次继续把怪故事做好的理由。</p><p class="paywall-msg-cute">1块钱买不到一张真正的脸，但可以给面具铺多留一盏灯。</p><p class="paywall-msg-warm2">无论是否支持，主线、提示、隐藏内容与全部结局都不会被锁住。</p></div></div><div class="paywall-footer"><div class="paywall-hint"><span class="paywall-hint-icon">💡</span><span>记录保存在本机浏览器；清除浏览器数据后，支持标记也会消失。</span></div><div class="paywall-btns"><button class="paywall-btn paywall-btn-support" data-pay-done>已完成支持 ♡</button><button class="paywall-btn paywall-btn-later" data-pay-close>下次一定</button></div></div><div class="paywall-studio">abc studio</div></div></div></div>`;
+    document.body.insertAdjacentHTML('beforeend',html);const overlay=document.getElementById('paywall-overlay');requestAnimationFrame(()=>requestAnimationFrame(()=>overlay?.classList.add('paywall-show')));
+    overlay?.querySelectorAll('[data-pay-close]').forEach(b=>b.onclick=()=>hidePaywall());
+    overlay?.querySelector('[data-pay-done]')?.addEventListener('click',()=>{setSupportPaid();hidePaywall();const t=document.createElement('div');t.className='paywall-toast';t.textContent='谢谢。面具铺的灯会再亮一会儿。';document.body.appendChild(t);setTimeout(()=>t.classList.add('show'),30);setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),400)},3000)});
+  }
+  function hidePaywall(){const o=document.getElementById('paywall-overlay');if(!o)return;o.classList.add('paywall-closing');o.classList.remove('paywall-show');setTimeout(()=>o.remove(),380)}
 
   function openHint(){
     const key=state.scene+'-'+currentChapterLabel();const level=(state.hints[key]||0);const hints=getHints();const shown=hints[Math.min(level,hints.length-1)];
@@ -701,9 +754,24 @@
   }
 
   function openInfo(title,html,onClose){modal(`<div class="kicker">卷宗边页</div><h2>${title}</h2>${html}`,{dark:true,wide:false,close:true,onClose})}
+  function showOpeningCinematic(ngp=false){
+    state.introShown=true;save();
+    showCinematic({image:'coast-house.webp',kicker:ngp?'残响视角 · 再次回到第七日':'序幕 · 第七日',lines:ngp?['海雾没有因为你知道真相而变薄。','七码头仍旧在原来的位置，只有旧习惯开始比物件更早出现。','这一次，阿七知道有些脸并不是为了被找到。']:OPENING_LINES,onDone:()=>{state.scene='shop';save();render();setTimeout(scheduleSupportAuto,900)},mode:'opening'});
+  }
+
+  function showCinematic({image='mask-shop.webp',kicker='过场',lines=[],onDone,mode='story'}){
+    closeModal();
+    const safeLines=lines.map((x,i)=>`<p class="cinematic-line ${i===0?'visible':''}" data-cine-line>${esc(x)}</p>`).join('');
+    modalRoot.innerHTML=`<div class="cinematic-layer cinematic-${mode}" id="cinematic-layer"><div class="cinematic-image" style="background-image:url('assets/images/${image}${ASSET_REV}')"></div><div class="cinematic-paper"></div><div class="cinematic-text"><div class="cinematic-kicker">${esc(kicker)}</div><div class="cinematic-lines">${safeLines}</div><button class="cinematic-next" id="cinematic-next">继续</button></div></div>`;
+    const layer=document.getElementById('cinematic-layer'),els=[...layer.querySelectorAll('[data-cine-line]')],btn=document.getElementById('cinematic-next');let idx=1,timer=null;
+    const reveal=()=>{if(idx<els.length){els[idx++].classList.add('visible');playSfx(idx%2?'knock':'glass');return false}return true};
+    if(state.reduced){els.forEach(x=>x.classList.add('visible'));idx=els.length}else{timer=setInterval(()=>{if(reveal()){clearInterval(timer);timer=null}},1180)}
+    btn.onclick=()=>{if(idx<els.length){if(timer){clearInterval(timer);timer=null}reveal();return}if(timer)clearInterval(timer);modalRoot.innerHTML='';onDone?.()};
+    layer.addEventListener('click',e=>{if(e.target===layer||e.target.classList.contains('cinematic-image'))btn.click()});
+  }
+
   function showStory(lines,done){
-    modal(`<div class="kicker">过场 · 点击即可继续阅读</div>${lines.map((x,i)=>`<p class="story-line ${i===0?'shown':''}" data-story-line>${esc(x)}</p>`).join('')}<button class="ink-btn story-next" id="story-next">继续</button>`,{classes:'story-card',close:false});
-    const els=[...document.querySelectorAll('[data-story-line]')];let idx=1;document.getElementById('story-next').onclick=()=>{if(idx<els.length){els[idx++].classList.add('shown');playSfx('knock')}else done?.()};
+    showCinematic({image:state.scene==='water'?'water-memory.webp':state.scene==='finale'?'finale.webp':'mask-shop.webp',kicker:'过场',lines,onDone:done,mode:'story'});
   }
 
   function modal(content,opts={}){
@@ -719,6 +787,8 @@
   // Keyboard comfort: Escape closes a modal or puts down the held item; N opens the observation notebook.
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){
+      const pw=document.getElementById('paywall-overlay');if(pw){hidePaywall();return}
+      const cine=document.getElementById('cinematic-next');if(cine){cine.click();return}
       const c=modalRoot.querySelector('.modal-close');
       if(c){c.click();return}
       if(heldItemId){heldItemId=null;render();return}
