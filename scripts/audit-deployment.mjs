@@ -64,6 +64,7 @@ const workflowGuards = [
   ['typecheck', /run:\s*npm run typecheck\b/],
   ['logic regression', /run:\s*npm run test:logic\b/],
   ['production build', /run:\s*npm run build\b/],
+  ['dist audit', /run:\s*npm run audit:dist\b/],
   ['configure-pages v6', /actions\/configure-pages@v6\b/],
   ['upload-pages-artifact v5', /actions\/upload-pages-artifact@v5\b/],
   ['deploy-pages v5', /actions\/deploy-pages@v5\b/],
@@ -78,6 +79,13 @@ for (const file of testRefs) if (!existsSync(file)) fail(`test:logic references 
 
 const vite = readFileSync(vitePath, 'utf8');
 if (!/base:\s*['"]\/face\/['"]/.test(vite)) fail('vite.config.ts base must be /face/ for Mike798-cloud/face GitHub Pages');
+
+
+if (!existsSync('public/.nojekyll')) fail('public/.nojekyll is missing');
+for (const legacy of ['assets', 'scripts/sync-static-assets.mjs']) {
+  if (existsSync(legacy)) fail(`legacy runtime path must be deleted before deployment: ${legacy}`);
+}
+if (String(pkg.scripts?.['audit:dist'] ?? '') !== 'node scripts/audit-dist.mjs') fail('package.json audit:dist script is missing or unexpected');
 
 const gitignore = readFileSync(gitignorePath, 'utf8');
 for (const ignored of ['node_modules/', 'dist/']) if (!gitignore.split(/\r?\n/).includes(ignored)) fail(`.gitignore must contain ${ignored}`);

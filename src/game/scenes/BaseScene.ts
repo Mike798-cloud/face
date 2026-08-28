@@ -47,7 +47,10 @@ export abstract class BaseScene extends Phaser.Scene {
   protected addBackground(key: string): Phaser.GameObjects.Image {
     const background = this.add.image(640, 360, key).setDisplaySize(1280, 720).setDepth(-20);
     if (!this.state.settings.reducedMotion) this.cameras.main.fadeIn(220, 12, 12, 10);
-    this.time.delayedCall(0, () => this.installDiegeticDialogue());
+    this.time.delayedCall(0, () => {
+      this.installDiegeticDialogue();
+      this.installWorldInspectables();
+    });
     return background;
   }
 
@@ -71,7 +74,92 @@ export abstract class BaseScene extends Phaser.Scene {
       if (this.state.settings.reducedMotion) { this.time.delayedCall(180, () => ripple.destroy()); return; }
       this.tweens.add({ targets: ripple, scaleX: 2.6, scaleY: 2.6, alpha: 0, duration: 520, ease: 'Sine.easeOut', onComplete: () => ripple.destroy() });
     });
-    zone.setDepth(18);
+    zone.setDepth(this.scene.key === 'butcher' || this.scene.key === 'mayor' ? 6 : 18);
+  }
+
+  private installWorldInspectables(): void {
+    type Reaction = 'glint' | 'tap' | 'sway' | 'ring';
+    interface Spec { x: number; y: number; w: number; h: number; text: string; sound: string; reaction: Reaction; }
+    const map: Partial<Record<string, readonly Spec[]>> = {
+      secret: [
+        { x: 390, y: 166, w: 170, h: 145, text: '玻璃罐壁有一圈被手掌反复擦亮的弧。里面的东西换过很多次，罐子的位置却几乎没有动。', sound: 'glass', reaction: 'glint' },
+        { x: 805, y: 172, w: 180, h: 150, text: '这一排罐塞并不齐。有一只塞子比其余的磨得更薄，像曾被人在犹豫时开合很多遍。', sound: 'glass', reaction: 'tap' },
+        { x: 1060, y: 462, w: 175, h: 125, text: '工作台右端留着一圈浅色水印。杯子早已拿走，木头仍记得它曾经每天停在这里。', sound: 'wood', reaction: 'ring' },
+      ],
+      water: [
+        { x: 690, y: 92, w: 150, h: 130, text: '钟壳没有锈，分针轴却留下了逆向摩擦的亮边。这里最固执的东西，反而最像曾经被人强行纠正过。', sound: 'clock', reaction: 'ring' },
+        { x: 385, y: 407, w: 220, h: 150, text: '桌脚在水里并没有漂。只有桌上的纸页不断换方向，像记忆在反复决定先说哪一句。', sound: 'paper', reaction: 'sway' },
+        { x: 804, y: 447, w: 190, h: 215, text: '椅背上有两道互相覆盖的抓痕。一道向前，一道向后；后来的那一道更深。', sound: 'wood', reaction: 'tap' },
+        { x: 1112, y: 333, w: 200, h: 330, text: '书柜门缝里夹着一张泡软的纸角。字已经散了，只剩纸纤维朝着同一个方向卷起。', sound: 'paper', reaction: 'glint' },
+      ],
+      elaine: [
+        { x: 106, y: 195, w: 170, h: 310, text: '墙上的旧面具并不完全贴合钉子。每一张背面都有同一处被拇指磨亮的缺口。', sound: 'paper', reaction: 'sway' },
+        { x: 1010, y: 230, w: 170, h: 320, text: '右墙的肖像来自不同年份。相框换过，钉孔却总比画框高半指，像挂画的人习惯先抬手再回落。', sound: 'paper', reaction: 'tap' },
+        { x: 1115, y: 390, w: 170, h: 520, text: '幕布下沿有一条比别处更深的折线。有人每次谢幕后都从同一个位置把它抓住。', sound: 'paper', reaction: 'sway' },
+      ],
+      milo: [
+        { x: 165, y: 250, w: 210, h: 380, text: '衣柜门把手很低，刚好是孩子踮脚能够到的高度。门板上的抓痕全在里面，不在外面。', sound: 'wood', reaction: 'tap' },
+        { x: 650, y: 103, w: 310, h: 120, text: '书架上的钟每天都停在同一格灰尘上。房间会变成什么样，和它几点钟没有关系。', sound: 'clock', reaction: 'glint' },
+        { x: 1117, y: 330, w: 145, h: 250, text: '床头灯的开关被磨得发白。恐惧来临以前，这只手曾经很多次先去找光。', sound: 'glass', reaction: 'ring' },
+        { x: 218, y: 628, w: 250, h: 105, text: '地毯下面没有怪物，只有四个被反复压平的角。人越害怕某个地方，越会记得它真实的重量。', sound: 'paper', reaction: 'sway' },
+      ],
+      postman: [
+        { x: 216, y: 220, w: 130, h: 230, text: '路灯的玻璃朝海一侧更浑。几十年的盐雾只从一个方向来，埃利亚斯从来不需要路牌确认它。', sound: 'glass', reaction: 'glint' },
+        { x: 427, y: 171, w: 170, h: 130, text: '帆船每次经过这里都先收一角帆。海上的路线会变，岸上的脚步却曾经三十年不肯变。', sound: 'sea', reaction: 'sway' },
+        { x: 1030, y: 172, w: 170, h: 210, text: '灯塔的光扫回来时，总比脚下的海风慢半拍。这里有两种循环，它们从来没有同步。', sound: 'sea', reaction: 'ring' },
+        { x: 650, y: 430, w: 180, h: 170, text: '邮箱铰链右侧比左侧亮。有人无数次用同一只手、同一个角度掀开过它。', sound: 'paper', reaction: 'tap' },
+      ],
+      soren: [
+        { x: 28, y: 198, w: 100, h: 250, text: '墙上的小龛没有供奉物，只有一层薄灰在内侧断开。有人常把手伸进去确认空间有多深。', sound: 'knock', reaction: 'tap' },
+        { x: 855, y: 430, w: 190, h: 115, text: '石碗的边缘有两处不同的磨痕。索伦分不清谁的脸，却记得两个人端碗时手指落下的位置并不一样。', sound: 'glass', reaction: 'ring' },
+        { x: 1055, y: 520, w: 180, h: 170, text: '最右边的凳脚短了一点。坐下的人会先向左挪半寸，再开口说话。', sound: 'wood', reaction: 'sway' },
+      ],
+      blank: [
+        { x: 414, y: 474, w: 160, h: 180, text: '旧照片边缘被拇指摸软。照片里的人已经不在，纸张却因此比新相框更像一件活过的东西。', sound: 'paper', reaction: 'glint' },
+        { x: 642, y: 500, w: 220, h: 120, text: '桌上的薄册没有标题。第一页被撕掉以后，后面的纸反而更容易翻开。', sound: 'paper', reaction: 'sway' },
+      ],
+      finale: [
+        { x: 275, y: 216, w: 250, h: 165, text: '左台玻璃罩内侧有一道手指擦过的弧。有人曾经在机器给出结果以后，又伸手进去确认了一遍。', sound: 'glass', reaction: 'glint' },
+        { x: 640, y: 212, w: 230, h: 160, text: '中央刻度最常停在中间，却不是因为那里最正确，只因为机械臂回位时一定经过那里。', sound: 'clock', reaction: 'ring' },
+        { x: 1030, y: 215, w: 250, h: 165, text: '右台的黄铜边缘比别处暖。机器冷却以后，这一块仍会多留几秒人的体温。', sound: 'wood', reaction: 'tap' },
+      ],
+      ending: [
+        { x: 150, y: 330, w: 160, h: 300, text: '旧镜上的裂纹没有继续长。镜子并不要求裂缝被修好，只负责把站在前面的人照回来。', sound: 'glass', reaction: 'glint' },
+        { x: 390, y: 390, w: 160, h: 170, text: '灯油只剩薄薄一层。它仍然亮着，不因为有人命令它照向哪一张脸。', sound: 'glass', reaction: 'ring' },
+      ],
+    };
+    const specs = map[this.scene.key];
+    if (!specs) return;
+    specs.forEach((spec) => {
+      const zone = this.add.zone(spec.x, spec.y, spec.w, spec.h).setDepth(3).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => {
+        this.ui.setCaption(spec.text);
+        this.audio.playSfx(spec.sound, .08);
+        this.playInspectableReaction(spec.x, spec.y, spec.w, spec.h, spec.reaction);
+      });
+    });
+  }
+
+  private playInspectableReaction(x: number, y: number, width: number, height: number, reaction: 'glint' | 'tap' | 'sway' | 'ring'): void {
+    if (reaction === 'glint') {
+      const glint = this.add.rectangle(x - width * .22, y, 3, Math.max(38, height * .62), 0xeadfc8, .08)
+        .setAngle(17).setBlendMode(Phaser.BlendModes.ADD).setDepth(4);
+      if (this.state.settings.reducedMotion) { this.time.delayedCall(140, () => glint.destroy()); return; }
+      this.tweens.add({ targets: glint, x: x + width * .22, alpha: 0, duration: 480, onComplete: () => glint.destroy() });
+      return;
+    }
+    if (reaction === 'ring') {
+      const ring = this.add.ellipse(x, y, Math.max(28, width * .22), Math.max(20, height * .18), 0xd7c39d, .015)
+        .setStrokeStyle(1.5, 0xd7c39d, .34).setDepth(4);
+      if (this.state.settings.reducedMotion) { this.time.delayedCall(140, () => ring.destroy()); return; }
+      this.tweens.add({ targets: ring, scaleX: 2.15, scaleY: 1.75, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
+      return;
+    }
+    const mark = reaction === 'tap'
+      ? this.add.rectangle(x, y, Math.max(20, width * .18), Math.max(14, height * .12), 0xc6b18b, .025).setStrokeStyle(1.5, 0xc6b18b, .3).setDepth(4)
+      : this.add.ellipse(x, y, Math.max(24, width * .2), Math.max(18, height * .16), 0xc6b18b, .018).setStrokeStyle(1.2, 0xc6b18b, .28).setDepth(4);
+    if (this.state.settings.reducedMotion) { this.time.delayedCall(140, () => mark.destroy()); return; }
+    this.tweens.add({ targets: mark, x: x + (reaction === 'sway' ? 10 : 0), angle: reaction === 'sway' ? 3 : 0, scale: 1.15, alpha: 0, duration: 380, yoyo: reaction === 'sway', onComplete: () => mark.destroy() });
   }
 
   protected setObjective(text: string): void {

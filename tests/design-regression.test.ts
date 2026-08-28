@@ -26,8 +26,22 @@ assert.match(secret, /strokeEllipse|strokeRect/, 'workbench must visually advert
 assert.match(secret, /prologue\.opened && !this\.state\.hiddenFlags\.includes\('prologue-box-opened-v52'\)/, 'only legacy saves may receive pre-v5.2 box traces automatically');
 
 const mayor = read('src/game/scenes/MayorScene.ts');
-assert.match(mayor, /slotPositions/, 'mayor lectern must show three visible paper slots');
-assert.match(mayor, /flipped = !flipped/, 'mayor papers must physically flip between public and private sides');
+assert.match(mayor, /createEvidenceSources/, 'mayor evidence must be discovered from physical room sources before it can be compared');
+assert.match(mayor, /mayor-evidence:/, 'mayor evidence discovery must persist across reloads');
+assert.match(mayor, /revealLecternCompartment/, 'correct mayor evidence must open a physical lectern compartment');
+assert.match(mayor, /createNoseResidue/, 'mayor completion must reveal a physical nose-bridge residue pickup');
+assert.doesNotMatch(mayor, /flipped = !flipped/, 'mayor must not regress to six pre-written flip cards');
+
+
+const butcher = read('src/game/scenes/ButcherScene.ts');
+assert.match(butcher, /createEnvironmentalClues/, 'butcher must let wall, lamp, portrait and pigs demonstrate seating rules in-world');
+assert.match(butcher, /drawAnimalMotif/, 'butcher identity pieces must be physical pictorial tokens rather than six text-only name cards');
+assert.match(butcher, /revealUnderTableDrawer/, 'pulling the seventh chair must expose a new physical drawer');
+assert.match(butcher, /createLipResidue/, 'butcher drawer must contain a physical residue pickup before completion');
+assert.doesNotMatch(butcher, /createNameCards/, 'old text-card seating implementation must stay removed');
+
+assert.match(base, /installWorldInspectables/, 'painted rooms must expose optional tactile world reactions beyond puzzle-only hotspots');
+assert.match(base, /playInspectableReaction/, 'optional world objects must visibly respond instead of behaving like inert background art');
 
 const milo = read('src/game/scenes/MiloScene.ts');
 assert.match(milo, /createViewMask/, 'Milo view switch must be an in-world mask rather than a generic UI toggle');

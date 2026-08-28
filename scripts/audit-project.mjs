@@ -32,6 +32,11 @@ const required = [
   'public/assets/audio/voice/dialogue-soren.ogg',
   'public/assets/audio/voice/dialogue-water-woman.ogg',
 ];
+
+const legacyPaths = ['assets', 'scripts/sync-static-assets.mjs'];
+const lingeringLegacy = legacyPaths.filter((path) => existsSync(path));
+if (lingeringLegacy.length) throw new Error(`Legacy runtime files must be deleted: ${lingeringLegacy.join(', ')}`);
+
 const missing = required.filter((file) => !existsSync(file));
 if (missing.length) throw new Error(`Missing required files: ${missing.join(', ')}`);
 
@@ -75,4 +80,4 @@ for (const file of sourceFiles) {
   }
 }
 if (violations.length) throw new Error(`Release audit failed:\n${violations.join('\n')}`);
-console.log(`audit-project: ${sourceFiles.length} source/config files checked; original WebP artwork and ${voiceFiles.length} packaged OGG voice files verified; no placeholder scene SVG or legacy ghost-cutout references; no forbidden TS escapes.`);
+console.log(`audit-project: ${sourceFiles.length} source/config files checked; packaged WebP artwork and ${voiceFiles.length} OGG voice files verified; legacy /assets runtime removed; no placeholder scene SVG, ghost-cutout references or forbidden TS escapes.`);

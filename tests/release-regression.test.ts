@@ -3,6 +3,8 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = process.cwd();
+assert.equal(existsSync(join(root, 'assets')), false, 'legacy pre-Vite assets directory must be deleted');
+assert.equal(existsSync(join(root, 'scripts', 'sync-static-assets.mjs')), false, 'obsolete asset copy script must be deleted');
 const sceneDir = join(root, 'src', 'game', 'scenes');
 const sceneFiles = [
   'ShopScene.ts','SecretScene.ts','WaterMemoryScene.ts','MayorScene.ts','ButcherScene.ts',
@@ -33,4 +35,4 @@ assert.match(css, /body::before \{ opacity:0/, 'global noise overlay must stay d
 assert.match(css, /\.grain \{ opacity:0/, 'scanline grain must stay disabled in the clean-art pass');
 assert.match(css, /backdrop-filter:none/, 'world chrome must not blur the scene underneath it');
 
-console.log('release-regression.test.ts: assets, physical pickups and clean presentation guards passed');
+console.log('release-regression.test.ts: self-contained public assets, physical pickups, legacy cleanup and clean presentation guards passed');
