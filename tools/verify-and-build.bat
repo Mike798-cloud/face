@@ -3,29 +3,32 @@ setlocal
 cd /d "%~dp0\.."
 chcp 65001 >nul
 
-echo [1/8] Node / npm
+echo [1/9] Node / npm
 node -v || goto :fail
 npm -v || goto :fail
 
-echo [2/8] Install locked dependencies
-call npm install || goto :fail
+echo [2/9] GitHub Pages / lockfile deployment audit
+node scripts\audit-deployment.mjs || goto :fail
 
-echo [3/8] Restore original hand-painted artwork
+echo [3/9] Install locked dependencies (same as GitHub Actions)
+call npm ci || goto :fail
+
+echo [4/9] Restore original hand-painted artwork
 call npm run sync:art || goto :fail
 
-echo [4/8] Release asset / source audit
+echo [5/9] Release asset / source audit
 call npm run audit || goto :fail
 
-echo [5/8] Verify versions
+echo [6/9] Verify versions
 call npm ls phaser typescript vite || goto :fail
 
-echo [6/8] TypeScript
+echo [7/9] TypeScript
 call npm run typecheck || goto :fail
 
-echo [7/8] Logic regression
+echo [8/9] Logic regression
 call npm run test:logic || goto :fail
 
-echo [8/8] Production build
+echo [9/9] Production build
 call npm run build || goto :fail
 
 if not exist dist\index.html goto :fail
@@ -33,7 +36,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$bad=Get-ChildItem dist 
 if errorlevel 1 goto :fail
 
 echo.
-echo PASS: original art / audit / typecheck / logic / build completed.
+echo PASS: deploy audit / locked install / original art / source audit / typecheck / logic / build completed.
 echo Run "npm run preview" and complete the full playthrough before pushing.
 exit /b 0
 
