@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { createDefaultState, isFinaleUnlocked, isHiddenUnlocked } from '../src/core/GameState.ts';
+import { finalePairCorrect, mayorSolved, seatingSolved, BUTCHER_SEATING } from '../src/game/puzzles/logic.ts';
+
+const state = createDefaultState();
+assert.equal(isHiddenUnlocked(state), false);
+assert.equal(isFinaleUnlocked(state), false);
+state.prologue.opened = true;
+state.craft.completed = true;
+state.water.completed = true;
+state.completedMasks.push('mayor', 'butcher', 'elaine');
+assert.equal(isHiddenUnlocked(state), true);
+state.completedMasks.push('milo', 'postman');
+assert.equal(isFinaleUnlocked(state), true);
+assert.equal(mayorSolved(['subsidy', 'ledger', 'harbor']), true);
+const seats: Record<string,string> = {};
+for (const [animal, seat] of Object.entries(BUTCHER_SEATING)) seats[seat] = animal;
+assert.equal(seatingSolved(seats), true);
+assert.equal(finalePairCorrect('mirror', ['see','discern']), true);
+assert.equal(finalePairCorrect('rhythm', ['hear','act']), true);
+assert.equal(finalePairCorrect('warmth', ['speech','warm']), true);
+console.log('flow.test.ts: full progression gates and finale pairings passed');

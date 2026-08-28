@@ -1,8 +1,34 @@
-type Handler=(payload?:any)=>void;
-export class EventBus{
-  private map=new Map<string,Set<Handler>>();
-  on(name:string,fn:Handler){if(!this.map.has(name))this.map.set(name,new Set());this.map.get(name)!.add(fn);return()=>this.off(name,fn)}
-  off(name:string,fn:Handler){this.map.get(name)?.delete(fn)}
-  emit(name:string,payload?:any){for(const fn of this.map.get(name)||[])try{fn(payload)}catch(e){console.error('[EventBus]',name,e)}}
+import type { SceneId } from './GameState';
+
+export interface AppEvents {
+  navigate: { scene: SceneId };
+  toast: { text: string; tone?: 'normal' | 'good' | 'warning' };
+  stateChanged: undefined;
+  openNotebook: undefined;
+  openHint: undefined;
+  openSettings: undefined;
+  title: undefined;
 }
-export const bus=new EventBus();
+
+type EventName = keyof AppEvents;
+type Listener<K extends EventName> = (payload: AppEvents[K]) => void;
+
+export class EventBus {
+  private readonly listeners = new Map<EventName, Set<(payload: never) => void>>();
+
+  on<K extends EventName>(event: K, listener: Listener<K>): () => void {
+    const set = this.listeners.get(event) ?? new Set<(payload: never) => void>();
+    const wrapped = listener as (payload: never) => void;
+    set.add(wrapped);
+    this.listeners.set(event, set);
+    return () => set.delete(wrapped);
+  }
+
+  emit<K extends EventName>(event: K, payload: AppEvents[K]): void {
+    const set = this.listeners.get(event);
+    if (!set) return;
+    set.forEach((listener) => listener(payload as never));
+  }
+}
+
+export const eventBus = new EventBus();

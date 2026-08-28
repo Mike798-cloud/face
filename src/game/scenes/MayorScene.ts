@@ -1,79 +1,161 @@
-import {BaseScene} from './BaseScene';
-import {bus} from '../../core/EventBus';
 import Phaser from 'phaser';
-const P=Phaser;
-export class MayorScene extends BaseScene{
-  constructor(){super('Mayor')}
-  preload(){this.loadSceneImage('mayor.webp')}
-  create(){
-    const w=this.scale.width,h=this.scale.height;
-    this.add.image(w/2,h/2,'bg').setDisplaySize(w,h).setTint(0xd4c6ad);
-    this.add.rectangle(w*.25,h*.49,w*.46,h*.68,0x191a17,.28).setStrokeStyle(1,0xb4a176,.6);
-    this.add.rectangle(w*.75,h*.49,w*.46,h*.68,0x2a2118,.3).setStrokeStyle(1,0xb4a176,.6);
-    this.add.text(w*.25,h*.12,'公开演讲厅',{fontFamily:'serif',fontSize:'20px',color:'#eadfc9'}).setOrigin(.5);
-    this.add.text(w*.75,h*.12,'私人办公室',{fontFamily:'serif',fontSize:'20px',color:'#eadfc9'}).setOrigin(.5);
-    bus.emit('hint','六张句卡都能翻面。不要判断“好人 / 坏人”；把能同时经得起公开场景和私人痕迹的三张卡翻到可验证的一面，再拖上讲台。');
+import { BaseScene } from './BaseScene';
+import { mayorSolved } from '../puzzles/logic';
+import { SCENE_INTROS } from '../../data/storyData';
 
-    const cards=[
-      {id:'a',front:'孤儿院预算按季度列支。',back:'拖到下季也不会有人追问。'},
-      {id:'b',front:'孤儿院修缮款已按程序拨付。',back:'我让秘书绕过流程，当晚先付了工钱。'},
-      {id:'c',front:'父亲从未影响我的公共判断。',back:'他的失业让我厌恶所有临时工。'},
-      {id:'d',front:'采购一直交由委员会决定。',back:'我记不住那些商号，只记得盖章顺序。'},
-      {id:'e',front:'我从不为亲属企业开例外。',back:'父亲失业后，我签下那份承包单。'},
-      {id:'f',front:'审批从不迟于规定时间。',back:'那一次我提前两天，因为屋顶正在漏。'}
-    ];
-    const slots=[w*.42,w*.5,w*.58].map((x,i)=>{
-      const z=this.add.rectangle(x,h*.3,w*.13,h*.1,0x6e5938,.76).setStrokeStyle(1,0xd1b77e);
-      this.add.text(x,h*.3,`讲台 ${i+1}`,{fontFamily:'serif',fontSize:'12px',color:'#f2e5cd'}).setOrigin(.5);
-      return z;
+interface Statement { id: string; publicText: string; privateText: string; }
+interface CardRecord {
+  id: string;
+  card: Phaser.GameObjects.Container;
+  paper: Phaser.GameObjects.Rectangle;
+  home: { x: number; y: number };
+}
+
+const STATEMENTS: Statement[] = [
+  { id: 'ledger', publicText: '“账本应当公开。”', privateText: '抽屉里没有第二本账。' },
+  { id: 'harbor', publicText: '“先修码头，再修我的办公室。”', privateText: '办公室预算仍是去年的数字。' },
+  { id: 'subsidy', publicText: '“补助不得经过家族账户。”', privateText: '汇款栏没有奥斯文家族印章。' },
+  { id: 'family', publicText: '“我的家人从未受益。”', privateText: '窗后压着一张侄子的供货单。' },
+  { id: 'tax', publicText: '“今年没有新增税款。”', privateText: '桌边印章写着“临时雾税”。' },
+  { id: 'speech', publicText: '“我从未删改演讲稿。”', privateText: '火盆里有三条同色纸边。' },
+];
+
+export class MayorScene extends BaseScene {
+  constructor() { super('mayor'); }
+  preload(): void { this.preloadImage('bg-mayor', 'mayor.webp'); }
+
+  create(): void {
+    this.ui.setScene('mayor');
+    this.audio.playAmbient('mayor', .18);
+    this.addBackground('bg-mayor');
+    this.addAtmosphere('dust', 12);
+    this.installMayorLife();
+    const intro = SCENE_INTROS.mayor!;
+    this.setObjective(intro.objective);
+    if (this.state.mayor.completed) { this.addNavArrow('forward', () => this.navigate('shop')); return; }
+
+    const lectern = this.add.rectangle(610, 430, 300, 250, 0x654931, .035).setStrokeStyle(2, 0xd0b985, .22).setDepth(3);
+    const slotPositions = [{ x: 525, y: 405 }, { x: 695, y: 405 }, { x: 610, y: 495 }] as const;
+    slotPositions.forEach((slot) => {
+      this.add.rectangle(slot.x, slot.y, 164, 58, 0xd7c6a0, .055).setStrokeStyle(1.5, 0xcab388, .30).setDepth(4);
+      this.add.rectangle(slot.x, slot.y - 30, 26, 6, 0x8b7757, .58).setStrokeStyle(1, 0x3d3327, .55).setDepth(5);
     });
-    const placed=['','',''];
-    const cardSlot:Record<string,number>={};
-    const cardFace:Record<string,'front'|'back'>={};
+    const selected = new Set(this.state.mayor.selected);
 
-    cards.forEach((c,i)=>{
-      const homeX=w*(.12+(i%3)*.25),homeY=h*(.55+Math.floor(i/3)*.16);
-      const ctr=this.add.container(homeX,homeY);
-      const paper=this.add.rectangle(0,0,w*.2,h*.11,0xdbc8a5,.96).setStrokeStyle(1,0x4c3c2c);
-      const tx=this.add.text(0,0,c.front,{fontFamily:'serif',fontSize:'12px',color:'#221b13',wordWrap:{width:w*.18},align:'center'}).setOrigin(.5);
-      ctr.add([paper,tx]);ctr.setSize(w*.2,h*.11).setInteractive({draggable:true,useHandCursor:true});this.input.setDraggable(ctr);
-      cardFace[c.id]='front';let moved=0;
-      ctr.on('dragstart',()=>moved=0);
-      ctr.on('drag',(_:any,nx:number,ny:number)=>{moved++;ctr.x=nx;ctr.y=ny});
-      ctr.on('pointerup',()=>{
-        if(moved>=2)return;
-        cardFace[c.id]=cardFace[c.id]==='front'?'back':'front';
-        tx.setText(cardFace[c.id]==='back'?c.back:c.front);
-        paper.setFillStyle(cardFace[c.id]==='back'?0xb9a789:0xdbc8a5);
-        this.sceneReaction(c.id,cardFace[c.id]);
+    const records: CardRecord[] = [];
+    STATEMENTS.forEach((statement, index) => {
+      const homes = [
+        { x: 250, y: 548 }, { x: 430, y: 592 }, { x: 1080, y: 565 },
+        { x: 1020, y: 205 }, { x: 875, y: 585 }, { x: 730, y: 603 },
+      ] as const;
+      const home = homes[index] ?? { x: 160 + index * 150, y: 620 };
+      const card = this.add.container(home.x, home.y).setDepth(8);
+      const paper = this.add.rectangle(0, 0, 178, 62, selected.has(statement.id) ? 0x69705f : 0xd0bd98).setStrokeStyle(2, 0x3d3327);
+      const text = this.add.text(0, 0, statement.publicText, {
+        fontFamily: 'Georgia, "Noto Serif SC", serif', fontSize: '14px', color: '#2d2922',
+        align: 'center', wordWrap: { width: 160 },
+      }).setOrigin(.5);
+      const fold = this.add.triangle(78, -23, 0, 0, 12, 0, 12, 12, 0x7d6a4e, .42);
+      card.add([paper, text, fold]);
+      card.setSize(184, 68).setInteractive({ useHandCursor: true });
+      this.input.setDraggable(card);
+      let flipped = false;
+      let dragged = false;
+      card.on('pointerdown', () => { dragged = false; });
+      card.on('pointerup', () => {
+        if (dragged) return;
+        flipped = !flipped;
+        text.setText(flipped ? statement.privateText : statement.publicText);
+        paper.setFillStyle(selected.has(statement.id) ? 0x69705f : (flipped ? 0xc1af8d : 0xd0bd98));
+        this.audio.playSfx('paper', .12);
+        if (!this.state.settings.reducedMotion) this.tweens.add({ targets: card, scaleX: .94, duration: 80, yoyo: true, ease: 'Sine.easeInOut' });
       });
-      ctr.on('dragend',()=>{
-        let hit=-1;slots.forEach((z,si)=>{if(P.Geom.Intersects.RectangleToRectangle(ctr.getBounds(),z.getBounds()))hit=si});
-        if(hit<0){const prior=cardSlot[c.id];if(prior!=null){ctr.x=slots[prior].x;ctr.y=slots[prior].y}else{ctr.x=homeX;ctr.y=homeY}return}
-        const occupant=placed[hit];
-        if(occupant&&occupant!==c.id){this.feedback('讲台这个位置已经有一张卡。先把原卡拖走或换到别处。');const prior=cardSlot[c.id];if(prior!=null){ctr.x=slots[prior].x;ctr.y=slots[prior].y}else{ctr.x=homeX;ctr.y=homeY}return}
-        const prior=cardSlot[c.id];if(prior!=null&&prior!==hit)placed[prior]='';
-        placed[hit]=c.id;cardSlot[c.id]=hit;ctr.x=slots[hit].x;ctr.y=slots[hit].y;this.sceneReaction(c.id,cardFace[c.id]);
+      card.on('dragstart', () => { dragged = true; card.setDepth(14).setScale(1.02); });
+      card.on('drag', (_p: Phaser.Input.Pointer, x: number, y: number) => card.setPosition(x, y));
+      card.on('dragend', () => {
+        card.setDepth(8).setScale(1);
+        if (lectern.getBounds().contains(card.x, card.y)) {
+          if (!selected.has(statement.id) && selected.size >= 3) {
+            this.ui.setCaption('讲台只容得下三张。多出来的纸滑到地上。');
+            this.moveContainer(card, home.x, home.y);
+            return;
+          }
+          const wasNew = !selected.has(statement.id);
+          selected.add(statement.id);
+          paper.setFillStyle(0x69705f);
+          if (wasNew) this.applyStatementReaction(statement.id);
+          this.persist([...selected]);
+          this.layoutSelected(records, selected);
+          this.checkSolved([...selected], records.map((record) => record.card));
+          return;
+        }
+
+        if (selected.delete(statement.id)) {
+          paper.setFillStyle(0xd0bd98);
+          this.persist([...selected]);
+          this.layoutSelected(records, selected);
+        }
+        this.moveContainer(card, home.x, home.y);
       });
+      records.push({ id: statement.id, card, paper, home });
     });
 
-    const check=this.add.text(w*.82,h*.86,'对照两边',{fontFamily:'serif',fontSize:'17px',color:'#efe3ca',backgroundColor:'#3a3024',padding:{x:16,y:10}}).setOrigin(.5).setInteractive();
-    check.on('pointerdown',()=>{
-      const chosen=placed.filter(Boolean);
-      const exact=['b','e','f'].every(x=>chosen.includes(x))&&chosen.length===3;
-      const flipped=['b','e','f'].every(x=>cardFace[x]==='back');
-      if(exact&&flipped){
-        this.feedback('两个半房间第一次不再互相否定。绕开程序、父亲失业与提前审批同时留下了可验证后果。',true);
-        this.time.delayedCall(900,()=>this.finishMask('mayor','res_bian',['mayor_public','mayor_father'],'mayor'))
-      }else{
-        this.state.mistakes++;this.store.save();this.cameras.main.shake(180,.0025);
-        this.feedback(exact?'三张卡选对了，但至少一张还停留在公开话术那一面。翻到能被私人痕迹验证的一面。':'讲台左侧与办公室右侧出现了具体矛盾。不是所有“坦白”都能被物证支撑。')
-      }
-    });
-    this.makeZone(w*.07,h*.08,w*.1,h*.07,'返回',()=>bus.emit('scene','shop'));
+    this.layoutSelected(records, selected, false);
+    if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
+      this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });
+      this.ui.setCaption('奥斯文把演讲稿散在两个房间里。正面的话很体面，背后的痕迹却未必肯替它们作证。');
+    }
   }
-  sceneReaction(id:string,face:'front'|'back'){
-    const map:any={b:'办公室账簿里一页日期突然与讲台投影重合。',e:'墙上父亲的旧工牌被阴影切成两半。',f:'两边的时钟短暂走到同一分钟。'};
-    if(map[id]&&face==='back')this.feedback(map[id],true);else this.feedback('这句话改变了其中一边，但另一个房间没有给出同样强度的回应。')
+
+  private installMayorLife(): void {
+    this.addBlinkEasterEgg(190, 150, 150, 190, 18, 12, 'paper');
+    this.addPulseEasterEgg(910, 290, 210, 180, 0xc7b792, 'glass');
+    if (!this.state.settings.reducedMotion) {
+      const dustPaper = this.add.rectangle(890, 174, 34, 22, 0xd7c9a8, .12).setDepth(2).setAngle(-8);
+      this.tweens.add({ targets: dustPaper, y: 181, angle: 3, alpha: { from: .06, to: .17 }, duration: 2400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const leaf = this.add.ellipse(1115, 300, 14, 42, 0x4b5e48, .08).setDepth(2).setAngle(-22);
+      this.tweens.add({ targets: leaf, angle: -12, x: 1118, duration: 1900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+  }
+
+  private layoutSelected(records: CardRecord[], selected: Set<string>, animate = true): void {
+    const slots = [
+      { x: 525, y: 405 },
+      { x: 695, y: 405 },
+      { x: 610, y: 495 },
+    ];
+    const order = this.state.mayor.selected.filter((id) => selected.has(id));
+    records.forEach((record) => {
+      if (!selected.has(record.id)) return;
+      const index = order.indexOf(record.id);
+      const slot = slots[Math.max(0, index)] ?? slots[slots.length - 1]!;
+      if (animate) this.moveContainer(record.card, slot.x, slot.y, 150);
+      else record.card.setPosition(slot.x, slot.y);
+      record.paper.setFillStyle(0x69705f);
+    });
+  }
+
+  private persist(selected: string[]): void {
+    this.store.mutate((s) => { s.mayor.selected = selected; }, false);
+  }
+
+  private applyStatementReaction(id: string): void {
+    const reactions: Record<string, string> = {
+      ledger: '私人抽屉没有自己弹开。', harbor: '窗外的码头灯先亮了一盏。', subsidy: '家族印章仍留在盒里。',
+      family: '右侧供货单从窗缝里滑出半截。', tax: '桌边“临时雾税”的印章渗出湿墨。', speech: '火盆里的三条纸边突然卷起。',
+    };
+    this.ui.setCaption(reactions[id] ?? '两个房间都沉默了一瞬。');
+    this.audio.playSfx('paper', .35);
+  }
+
+  private checkSolved(selected: string[], cards: Phaser.GameObjects.Container[]): void {
+    if (!mayorSolved(selected)) return;
+    this.store.mutate((s) => { s.mayor.completed = true; });
+    this.completeMask('mayor', 'mayor-contradiction');
+    cards.forEach((card) => card.disableInteractive());
+    this.ui.setCaption('没有一句话被判作“真理”。只是两边都不再需要替它撒谎。鼻梁残响从讲台木纹里浮出来。');
+    this.audio.playSfx('wood', .55);
+    if (!this.state.settings.reducedMotion) { this.focusCamera(640, 330, 1.04, 240); this.time.delayedCall(360, () => this.resetCamera(220)); }
+    this.time.delayedCall(this.state.settings.reducedMotion ? 0 : 520, () => this.addNavArrow('forward', () => this.navigate('shop')));
   }
 }

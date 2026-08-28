@@ -1,22 +1,26 @@
-# 《面目》v4.0 — npm + Vite 工程说明
+# 《面目》The Face of It · v4.1
 
-本工程只做构建与依赖标准化，不增加或改写游戏内容。
+本版本针对“画面成立，但交互仍像网页”进行重构：核心场景交互由 Phaser + TypeScript 接管，DOM 只承担长文本、笔记本、设置和提示。
 
-## 固定版本
-
+## 固定技术栈
 - Phaser 3.90.0
 - TypeScript 5.7.2
 - Vite 6.3.1
+- HTML / CSS / SVG / WAV / WebAudio
 
-## 常用命令
-
-```bash
+## 本地验收
+```cmd
 npm install
-npm run dev
+npm run typecheck
+npm run test:logic
 npm run build
 npm run preview
 ```
 
-`npm run dev` / `npm run build` 会先把当前仓库已有的 `assets/images` 与 `assets/audio` 同步到 `public/assets`，保证 Vite 开发服务器和 `dist` 构建产物继续沿用原资源路径。
+GitHub Pages 使用 `.github/workflows/deploy.yml` 自动执行 `npm ci -> typecheck -> logic tests -> build -> deploy dist`。
 
-GitHub Pages 使用 `dist/` 作为发布目录；`vite.config.ts` 使用相对 `base: './'`，兼容项目页路径。
+## 交互原则
+- 动作发生在场景里：拖、转、拉、擦、扫描、行走、拼合。
+- 错误反馈说明世界规则，不弹“答错了”。
+- 核心谜题至少有两条世界内依据。
+- 手机端给连续操作提供大吸附区与点击/按键替代。

@@ -1,19 +1,177 @@
-import {BaseScene} from './BaseScene';
-import {bus} from '../../core/EventBus';
 import Phaser from 'phaser';
-const P=Phaser;
-export class EndingScene extends BaseScene{
-  branch:''|'A'|'B'|'C'=''; stitches=0; removed=0; shutter:any; lamp:any;
-  constructor(){super('Ending')}
-  preload(){this.loadSceneImage('mask-shop.webp')}
-  create(){const w=this.scale.width,h=this.scale.height;this.add.image(w/2,h/2,'bg').setDisplaySize(w,h).setTint(0xb8ab94);this.add.rectangle(w/2,h/2,w,h,0x0b0c0a,.34);bus.emit('hint','结局不再问“你选什么”。场景里有三件可以真正动手做的事：镜前半张脸、脸上的缝线、墙上的面具与门板。第一个不可逆动作会成为你的选择。');
-    this.acceptArea(w,h);this.facelessArea(w,h);this.closeArea(w,h);
+import { BaseScene } from './BaseScene';
+import { eventBus } from '../../core/EventBus';
+import type { EndingId } from '../../core/GameState';
+import { SCENE_INTROS } from '../../data/storyData';
+
+export class EndingScene extends BaseScene {
+  private pathLocked: EndingId | null = null;
+  private stitchCount = 0;
+  private masksStored = 0;
+
+  constructor() { super('ending'); }
+  preload(): void { this.preloadImage('bg-ending', 'mask-shop.webp'); }
+
+  create(): void {
+    this.ui.setScene('ending');
+    this.audio.playAmbient('sea', .13);
+    this.addBackground('bg-ending');
+    this.addAtmosphere('dust', 10);
+    this.installEndingLife();
+    const intro = SCENE_INTROS.ending!;
+    this.setObjective(intro.objective);
+    if (this.state.ending.completed) { this.renderCompleted(); return; }
+    this.createAcceptPath();
+    this.createUnfixedPath();
+    this.createClosePath();
+    if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
+      this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });
+      this.ui.setCaption('最后没有按钮，也没有标准答案。镜子、缝线和木箱都留在原处，等阿七亲手完成一种离开的动作。');
+    }
   }
-  commit(b:'A'|'B'|'C'){if(this.branch&&this.branch!==b)return false;if(!this.branch){this.branch=b;this.feedback(`你没有点击“${b}”。你只是开始做一件不能假装没做过的事。`,true)}return true}
-  acceptArea(w:number,h:number){const mirror=this.add.rectangle(w*.2,h*.42,w*.24,h*.48,0x1a1c1b,.48).setStrokeStyle(2,0xb9a781,.72);this.add.text(w*.2,h*.16,'旧镜',{fontFamily:'serif',fontSize:'16px',color:'#d8c8aa'}).setOrigin(.5);const half=this.add.container(w*.2,h*.76);half.add([this.add.rectangle(0,0,w*.12,h*.12,0xcdbb9a,.84).setStrokeStyle(1,0x49392b),this.add.text(0,0,'师父留下的\n半张脸',{fontFamily:'serif',fontSize:'11px',color:'#211b15',align:'center'}).setOrigin(.5)]);half.setSize(w*.12,h*.12).setInteractive({draggable:true});this.input.setDraggable(half);half.on('drag',(_:any,x:number,y:number)=>{if(this.branch&&this.branch!=='A')return;half.x=x;half.y=y});half.on('dragend',()=>{if(P.Geom.Intersects.RectangleToRectangle(half.getBounds(),mirror.getBounds())&&half.x>mirror.x){if(!this.commit('A')){half.x=w*.2;half.y=h*.76;return}half.disableInteractive();half.x=mirror.x+mirror.width*.18;half.y=mirror.y;this.feedback('右半脸被贴合；左半仍保持空白。完整不是对称，而是允许缺失继续存在。',true);this.finish('A')}else{half.x=w*.2;half.y=h*.76;this.feedback('镜子没有接受这个位置。师父留下的是右半，不是替阿七补齐整张脸。')}})}
-  facelessArea(w:number,h:number){const face=this.add.rectangle(w*.5,h*.42,w*.22,h*.38,0xd1c2a5,.36).setStrokeStyle(1,0xc8b58e,.65);this.add.text(w*.5,h*.16,'被残响固定的脸',{fontFamily:'serif',fontSize:'16px',color:'#d8c8aa'}).setOrigin(.5);for(let i=0;i<5;i++){const y=h*(.3+i*.065);const stitch=this.add.container(w*.5,y);stitch.add([this.add.rectangle(0,0,w*.18,4,0x32291f,.95),this.add.circle(-w*.09,0,4,0xb29c76),this.add.circle(w*.09,0,4,0xb29c76)]);stitch.setSize(w*.2,22).setInteractive({draggable:true});this.input.setDraggable(stitch);const sx=stitch.x;stitch.on('drag',(_:any,x:number)=>{if(this.branch&&this.branch!=='B')return;stitch.x=P.Math.Clamp(x,sx-120,sx+120)});stitch.on('dragend',()=>{if(Math.abs(stitch.x-sx)>70){if(!this.commit('B')){stitch.x=sx;return}stitch.destroy();this.stitches++;this.feedback(`第 ${this.stitches} 根缝线被拉掉。脸开始失去单一形状。`,true);if(this.stitches===5)this.finish('B')}else{stitch.x=sx;this.feedback('线被扯紧又弹回去。要真正把固定它的线拉掉。')}})} }
-  closeArea(w:number,h:number){this.add.text(w*.82,h*.16,'面具墙与门板',{fontFamily:'serif',fontSize:'16px',color:'#d8c8aa'}).setOrigin(.5);const masks=[];for(let i=0;i<5;i++){const x=w*(.75+(i%2)*.13),y=h*(.28+Math.floor(i/2)*.13);const m=this.add.container(x,y);m.add([this.add.rectangle(0,0,w*.09,h*.09,0x6f604d,.86).setStrokeStyle(1,0xb69f79),this.add.text(0,0,String(i+1),{fontFamily:'serif',fontSize:'12px',color:'#eadfc9'}).setOrigin(.5)]);m.setSize(w*.09,h*.09).setInteractive({draggable:true});this.input.setDraggable(m);const hx=x,hy=y;m.on('drag',(_:any,nx:number,ny:number)=>{if(this.branch&&this.branch!=='C')return;m.x=nx;m.y=ny});m.on('dragend',()=>{if(m.y>h*.72){if(!this.commit('C')){m.x=hx;m.y=hy;return}m.destroy();this.removed++;this.feedback(`第 ${this.removed} 张面具被摘下，没有替任何人归回原位。`,true);if(this.removed===5)this.enableShutter(w,h)}else{m.x=hx;m.y=hy}});masks.push(m)} }
-  enableShutter(w:number,h:number){this.shutter=this.add.rectangle(w*.82,h*.52,w*.28,h*.09,0x493a2a,.94).setStrokeStyle(2,0x1d160f).setInteractive({draggable:true});this.add.text(w*.82,h*.52,'木门板',{fontFamily:'serif',fontSize:'14px',color:'#e8dac0'}).setOrigin(.5);this.input.setDraggable(this.shutter);const sy=this.shutter.y;this.shutter.on('drag',(_:any,_x:number,y:number)=>{this.shutter.y=P.Math.Clamp(y,sy,sy+140)});this.shutter.on('dragend',()=>{if(this.shutter.y-sy>90){this.feedback('门板被拉下。现在只剩工作灯还亮着。',true);this.enableLamp(w,h)}else this.shutter.y=sy})}
-  enableLamp(w:number,h:number){this.lamp=this.add.text(w*.82,h*.82,'吹灭工作灯',{fontFamily:'serif',fontSize:'16px',color:'#f0ddb5',backgroundColor:'#493c2bdd',padding:{x:12,y:8}}).setOrigin(.5).setInteractive();this.lamp.on('pointerdown',()=>{this.cameras.main.fadeOut(this.state.reduced?0:900,0,0,0);this.time.delayedCall(this.state.reduced?50:950,()=>this.finish('C'))})}
-  finish(b:'A'|'B'|'C'){if(this.state.ending)return;this.state.ending=b;this.state.endingFlags.push(`ending_${b}`);this.store.save();this.time.delayedCall(700,()=>bus.emit('endingComplete',b))}
+
+
+  private installEndingLife(): void {
+    this.addBlinkEasterEgg(150, 328, 135, 300, 22, 13, 'glass');
+    [[440, 205], [520, 205], [600, 205], [680, 205], [440, 312]].forEach(([x, y], i) => {
+      const zone = this.add.zone(x!, y!, 64, 88).setDepth(5).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => {
+        this.audio.playSfx('breath', .08);
+        const mouth = this.add.ellipse(x!, y! + 18, 26, 2, 0x171310, .76).setDepth(6);
+        if (this.state.settings.reducedMotion) { mouth.setDisplaySize(26, 12); this.time.delayedCall(150, () => mouth.destroy()); return; }
+        this.tweens.add({ targets: mouth, scaleY: 5, duration: 120, yoyo: true, hold: 160 + i * 15, onComplete: () => mouth.destroy() });
+      });
+    });
+    this.addBreathingLight(390, 389, 150, 110, 0xe2bd77, .065, 2);
+  }
+
+  private createAcceptPath(): void {
+    this.add.ellipse(240, 315, 235, 330, 0x262620, .32).setStrokeStyle(3, 0xb19f7d, .45).setDepth(3);
+    const target = this.add.ellipse(275, 315, 86, 250, 0xa79076, .14).setDepth(4);
+    const half = this.add.container(120, 545).setDepth(8);
+    const halfFace = this.add.arc(0, 0, 72, -90, 90, false, 0xb5a487, .86).setStrokeStyle(3, 0x30271f);
+    const halfMarks = this.add.graphics().setAlpha(.62);
+    halfMarks.lineStyle(1.5, 0x30271f, .86);
+    halfMarks.strokeEllipse(20, -18, 20, 9);
+    halfMarks.beginPath(); halfMarks.moveTo(18, -4); halfMarks.lineTo(10, 17); halfMarks.strokePath();
+    halfMarks.lineBetween(9, 34, 31, 32);
+    half.add([halfFace, halfMarks]);
+    half.setSize(110, 160).setInteractive({ useHandCursor: true });
+    this.input.setDraggable(half);
+    half.on('dragstart', () => half.setDepth(14).setScale(1.035));
+    half.on('drag', (_p: Phaser.Input.Pointer, x: number, y: number) => half.setPosition(x, y));
+    half.on('dragend', () => {
+      half.setDepth(8).setScale(1);
+      if (Phaser.Math.Distance.Between(half.x, half.y, target.x, target.y) < 100) {
+        if (!this.lockPath('accept')) { this.moveContainer(half, 120, 545); return; }
+        this.moveContainer(half, target.x, target.y, 170, () => this.complete('accept'));
+      } else this.moveContainer(half, 120, 545);
+    });
+  }
+
+  private createUnfixedPath(): void {
+    this.add.ellipse(640, 315, 230, 320, 0x9c8b73, .18).setStrokeStyle(3, 0xb19f7d, .38).setDepth(3);
+    for (let i = 0; i < 7; i += 1) {
+      const y = 205 + i * 34;
+      const stitch = this.add.rectangle(640, y, 94, 5, 0x2d211c).setDepth(7).setInteractive({ useHandCursor: true });
+      this.input.setDraggable(stitch);
+      stitch.on('dragstart', () => stitch.setScale(1.05, 1.6));
+      stitch.on('drag', (_p: Phaser.Input.Pointer, x: number, dragY: number) => stitch.setPosition(x, dragY));
+      stitch.on('dragend', () => {
+        stitch.setScale(1);
+        if (Math.abs(stitch.x - 640) > 150) {
+          if (!this.lockPath('unfixed')) {
+            if (this.state.settings.reducedMotion) stitch.setPosition(640, y);
+            else this.tweens.add({ targets: stitch, x: 640, y, duration: 150, ease: 'Sine.easeOut' });
+            return;
+          }
+          stitch.disableInteractive();
+          this.stitchCount += 1;
+          this.audio.playSfx('stitch', .34);
+          if (this.state.settings.reducedMotion) stitch.setAlpha(.18);
+          else this.tweens.add({ targets: stitch, alpha: .12, x: stitch.x + Math.sign(stitch.x - 640) * 45, duration: 180, ease: 'Sine.easeOut' });
+          if (this.stitchCount >= 7) this.complete('unfixed');
+        } else if (this.state.settings.reducedMotion) stitch.setPosition(640, y);
+        else this.tweens.add({ targets: stitch, x: 640, y, duration: 150, ease: 'Sine.easeOut' });
+      });
+    }
+  }
+
+  private createClosePath(): void {
+    const crate = this.add.rectangle(1085, 520, 260, 115, 0x4d3424, .72).setStrokeStyle(4, 0x211912).setDepth(3);
+    const positions = [[920, 180], [1030, 180], [1140, 180], [975, 300], [1090, 300]] as const;
+    positions.forEach(([x, y]) => {
+      const item = this.add.container(x, y).setDepth(7);
+      const mask = this.add.ellipse(0, 0, 72, 92, 0xa89676, .82).setStrokeStyle(3, 0x30271f);
+      const features = this.add.graphics().setAlpha(.6);
+      features.lineStyle(1.4, 0x30271f, .8);
+      features.strokeEllipse(-12, -10, 12, 6); features.strokeEllipse(12, -10, 12, 6);
+      features.lineBetween(-12, 19, 12, 19);
+      item.add([mask, features]);
+      item.setSize(82, 104).setInteractive({ useHandCursor: true });
+      this.input.setDraggable(item);
+      item.on('dragstart', () => item.setDepth(14).setScale(1.035));
+      item.on('drag', (_p: Phaser.Input.Pointer, dx: number, dy: number) => item.setPosition(dx, dy));
+      item.on('dragend', () => {
+        item.setDepth(7).setScale(1);
+        if (crate.getBounds().contains(item.x, item.y)) {
+          if (!this.lockPath('close')) { this.moveContainer(item, x, y); return; }
+          item.disableInteractive();
+          this.masksStored += 1;
+          this.audio.playSfx('wood', .26);
+          if (this.state.settings.reducedMotion) item.setVisible(false);
+          else this.tweens.add({ targets: item, x: crate.x, y: crate.y, alpha: 0, scaleX: .72, scaleY: .72, duration: 190, ease: 'Sine.easeIn', onComplete: () => item.setVisible(false) });
+          if (this.masksStored >= 5) this.revealLamp();
+        } else this.moveContainer(item, x, y);
+      });
+    });
+  }
+
+  private revealLamp(): void {
+    if (this.children.getByName('ending-lamp')) return;
+    const lamp = this.add.circle(1080, 400, 34, 0xddbb72, .86).setStrokeStyle(3, 0x443522).setDepth(9).setInteractive({ useHandCursor: true }).setName('ending-lamp');
+    lamp.on('pointerdown', () => {
+      if (!this.lockPath('close')) return;
+      lamp.disableInteractive().setFillStyle(0x4a453a, .35);
+      if (!this.state.settings.reducedMotion) this.cameras.main.fadeOut(280, 12, 11, 8);
+      this.time.delayedCall(this.state.settings.reducedMotion ? 0 : 220, () => this.complete('close'));
+    });
+  }
+
+  private lockPath(path: EndingId): boolean {
+    if (this.pathLocked && this.pathLocked !== path) {
+      this.ui.setCaption('你已经开始了另一件事。这个动作被留在原处，没有替你改写选择。');
+      return false;
+    }
+    if (this.pathLocked === path) return true;
+    this.pathLocked = path;
+    const text: Record<EndingId, string> = {
+      accept: '半张脸贴近镜面，木纹在冷光里停了一瞬。',
+      unfixed: '第一根线离开皮肤，旧结在地板上轻轻弹了一下。',
+      close: '第一张面具落进木箱，墙上露出一块多年没有见过光的颜色。',
+    };
+    this.ui.setCaption(text[path]);
+    return true;
+  }
+
+  private complete(path: EndingId): void {
+    if (this.state.ending.completed) return;
+    this.store.mutate((s) => { s.ending.chosen = path; s.ending.progress = 1; s.ending.completed = true; s.ngPlus = true; });
+    this.audio.playSfx(path === 'close' ? 'wood' : 'breath', .5);
+    const endings: Record<EndingId, string> = {
+      accept: '半张脸贴近镜面，木纹没有继续向左生长。第二天，铺子仍开着，只是新订单最下面多了一行：有些地方不必替任何人填满。',
+      unfixed: '最后一根线离开皮肤时，没有露出一张所谓真正的脸。阿七只是终于不再急着证明哪张脸最早、最真。',
+      close: '工作灯熄灭，墙上的脸重新成为木头。阿七把门板拉到底；没有下一代，也可以是一种完整的结束。',
+    };
+    this.ui.setCaption(endings[path]);
+    this.time.delayedCall(this.state.settings.reducedMotion ? 0 : 1150, () => this.renderCompleted());
+  }
+
+  private renderCompleted(): void {
+    if (this.children.getByName('ending-complete')) return;
+    this.add.rectangle(640, 360, 1280, 720, 0x10110e, .55).setDepth(15).setName('ending-complete');
+    this.add.text(640, 300, '面 目', { fontFamily: 'Georgia, "Noto Serif SC", serif', fontSize: '60px', color: '#e0d1b1', letterSpacing: 18 }).setOrigin(.5).setDepth(16);
+    this.add.text(640, 385, '有些木头记得手，但记得并不等于拥有。', { fontFamily: 'Georgia, "Noto Serif SC", serif', fontSize: '17px', color: '#b9ad95' }).setOrigin(.5).setDepth(16);
+    this.addSymbolButton(640, 485, '⌂', () => eventBus.emit('title', undefined), 58).setDepth(17);
+  }
 }

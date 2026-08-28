@@ -1,68 +1,159 @@
-import {BaseScene} from './BaseScene';
-import {bus} from '../../core/EventBus';
 import Phaser from 'phaser';
-const P=Phaser;
+import { BaseScene } from './BaseScene';
+import { ELAINE_TARGET_ROTATIONS, elainePieceSolved } from '../puzzles/logic';
+import { SCENE_INTROS } from '../../data/storyData';
 
-type ShardMeta = {
-  id: string;
-  feature: string;
-  age: string;
-  solved: boolean;
-  inSlot: boolean;
-  homeX: number;
-  homeY: number;
-};
+export class ElaineScene extends BaseScene {
+  private selectedIndex = 0;
+  private pieces: Phaser.GameObjects.Container[] = [];
+  private mirrorVeil!: Phaser.GameObjects.Ellipse;
 
-type ShardContainer = Phaser.GameObjects.Container & { meta: ShardMeta };
-export class ElaineScene extends BaseScene{
-  focused:ShardContainer|null=null;
-  constructor(){super('Elaine')}
-  preload(){this.loadSceneImage('elaine.webp')}
-  create(){
-    const w=this.scale.width,h=this.scale.height;
-    this.add.image(w/2,h/2,'bg').setDisplaySize(w,h).setTint(0xd0c4b5);
-    bus.emit('hint','十二块镜片都能拖、转、拼。不要拼出“最初的脸”；按跨年龄仍稳定的旧耳洞、烧伤和高音前两次吸气，让动作轮廓同步。轻点镜片或按“旋转90°”可旋转。');
-    const features=['旧耳洞','烧伤','两次吸气'];
-    const ages=['17岁','26岁','34岁','43岁'];
-    const slots:any[]=[];
-    ages.forEach((age,ri)=>features.forEach((feature,ci)=>{
-      const x=w*(.45+ci*.18),y=h*(.27+ri*.14);
-      const z=this.add.rectangle(x,y,w*.15,h*.1,0x141618,.35).setStrokeStyle(1,0xa99a86,.65);
-      this.add.text(x,y-h*.04,ri===0?feature:'',{fontFamily:'serif',fontSize:'11px',color:'#d7c9b4'}).setOrigin(.5);
-      this.add.text(x,y+h*.035,age,{fontFamily:'serif',fontSize:'10px',color:'#9e907c'}).setOrigin(.5);
-      slots.push({x,y,feature,age,z});
-    }));
-    const solved=new Set<string>();
-    const shards:ShardContainer[]=[];
-    const attempt=(c:ShardContainer)=>{
-      const m=c.meta;if(m.solved)return;
-      let best:any=null,dist=1e9;
-      for(const s of slots){const d=P.Math.Distance.Between(c.x,c.y,s.x,s.y);if(d<dist){dist=d;best=s}}
-      if(!best||dist>w*.1||best.feature!==m.feature||best.age!==m.age){return false}
-      c.x=best.x;c.y=best.y;m.inSlot=true;
-      const norm=Math.abs(P.Math.Angle.WrapDegrees(c.angle));
-      if(norm>12){best.z.setStrokeStyle(2,0x9c7b55);this.feedback(`${m.age}的${m.feature}位置对了，但镜片方向仍让动作轮廓错开。继续旋转。`);return false}
-      m.solved=true;c.disableInteractive();best.z.setStrokeStyle(2,0x718064);solved.add(m.id);
-      this.feedback(`${m.age}的${m.feature}与其它年龄阶段进入同一节律。`,true);
-      if(solved.size===12){this.feedback('十二块镜片没有拼成一张原始脸，却让三个跨年龄动作完全同步。',true);this.time.delayedCall(1000,()=>this.finishMask('elaine','res_ting',['elaine_habit','elaine_face'],'elaine'))}
-      return true;
-    };
-    ages.forEach((age,ri)=>features.forEach((feature,ci)=>{
-      const i=ri*3+ci;const homeX=w*(.11+(i%3)*.1),homeY=h*(.22+Math.floor(i/3)*.18);
-      const poly=this.add.polygon(0,0,[0,-32,38,-18,30,27,-8,35,-36,8],0x9aa6a2,.54).setStrokeStyle(2,0xd8d4c7,.7);
-      const text=this.add.text(0,0,`${age}\n${feature}`,{fontFamily:'serif',fontSize:'10px',color:'#f0eadf',align:'center'}).setOrigin(.5);
-      const c=this.add.container(homeX,homeY,[poly,text]) as ShardContainer;c.setSize(80,70).setInteractive({draggable:true,useHandCursor:true});this.input.setDraggable(c);
-      c.angle=[90,180,270,0][i%4];c.meta={id:`${age}-${feature}`,feature,age,solved:false,inSlot:false,homeX,homeY};
-      let moved=0;
-      c.on('pointerdown',()=>{this.focused=c;moved=0});
-      c.on('drag',(_:any,nx:number,ny:number)=>{moved++;c.x=nx;c.y=ny});
-      c.on('pointerup',()=>{if(moved<2&&!c.meta.solved){c.angle=(c.angle+90)%360;attempt(c)}});
-      c.on('dragend',()=>{if(!attempt(c)){let best:any=null,dist=1e9;for(const s of slots){const d=P.Math.Distance.Between(c.x,c.y,s.x,s.y);if(d<dist){dist=d;best=s}}if(best&&dist<w*.1&&best.feature===feature&&best.age===age){c.x=best.x;c.y=best.y;c.meta.inSlot=true}else{c.x=homeX;c.y=homeY;c.meta.inSlot=false;this.feedback('镜片靠近了，但动作轮廓没有同步。错误组合会自行错开，不弹红叉。')}}});
-      shards.push(c);
-    }));
-    const rotateFocused=()=>{const c=this.focused||shards.find(x=>!x.meta.solved);if(c&&!c.meta.solved){c.angle=(c.angle+90)%360;attempt(c);this.feedback('镜片旋转了 90°。')}};
-    this.input.keyboard?.on('keydown-R',rotateFocused);
-    const off=bus.on('gesture',(g:any)=>{if(g==='rotate')rotateFocused()});this.events.once('shutdown',()=>off());
-    this.makeZone(w*.07,h*.08,w*.1,h*.07,'返回',()=>bus.emit('scene','shop'));
+  constructor() { super('elaine'); }
+
+  preload(): void {
+    this.preloadImage('bg-elaine', 'elaine.webp');
+    for (let i = 0; i < 12; i += 1) this.preloadImage(`elaine-piece-${i}`, `interaction/elaine-piece-${String(i).padStart(2, '0')}.webp`);
+  }
+
+  create(): void {
+    this.ui.setScene('elaine');
+    this.audio.playAmbient('elaine', .17);
+    this.addBackground('bg-elaine');
+    this.addAtmosphere('dust', 15);
+    this.installElaineLife();
+    const intro = SCENE_INTROS.elaine!;
+    this.setObjective(intro.objective);
+    if (this.state.elaine.completed) { this.addNavArrow('forward', () => this.navigate('shop')); return; }
+
+    this.mirrorVeil = this.add.ellipse(622, 284, 420, 472, 0x6a6e68, .82).setStrokeStyle(3, 0x3c3932, .42).setDepth(3);
+    if (!this.state.settings.reducedMotion) this.tweens.add({ targets: this.mirrorVeil, alpha: { from: .77, to: .86 }, duration: 2300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    const targets = this.targetPositions();
+    targets.forEach((pos) => {
+      this.add.rectangle(pos.x, pos.y, 112, 120, 0x1d1d19, .08).setStrokeStyle(1, 0xc9b998, .16).setDepth(4);
+    });
+
+    for (let i = 0; i < 12; i += 1) this.createPiece(i, targets[i]!);
+    this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _over: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => this.rotateSelected(dy > 0 ? 90 : -90));
+    if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
+      this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });
+      this.ui.setCaption('伊莲把十二块镜片留在后台。脸在每一年都不同，身体却还保留着同样的小动作。');
+    }
+  }
+
+
+  private installElaineLife(): void {
+    // Small, optional discoveries: the dressing room should feel watched even when the puzzle is untouched.
+    this.addMouthEasterEgg(214, 104, 120, 126, 34, 15, 'breath');
+    this.addBlinkEasterEgg(922, 113, 112, 128, 16, 11, 'paper');
+    this.addBlinkEasterEgg(905, 287, 108, 132, 15, 10, 'glass');
+    this.addMouthEasterEgg(205, 302, 132, 128, 30, 13, 'breath');
+    if (this.state.settings.reducedMotion) return;
+    [374, 794].forEach((x, column) => {
+      [57, 124, 190, 258, 326, 394].forEach((y, i) => {
+        const bulb = this.add.circle(x, y, 11, 0xf3d8a0, .03).setBlendMode(Phaser.BlendModes.ADD).setDepth(2);
+        this.tweens.add({ targets: bulb, alpha: { from: .012, to: .10 }, scale: { from: .96, to: 1.04 }, duration: 920 + i * 80 + column * 130, yoyo: true, repeat: -1, delay: i * 55, ease: 'Sine.easeInOut' });
+      });
+    });
+    const curtainShadow = this.add.rectangle(1205, 348, 175, 610, 0x170e0d, .02).setDepth(1).setAngle(-1);
+    this.tweens.add({ targets: curtainShadow, x: 1192, angle: .8, alpha: .055, duration: 2800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  private targetPositions(): Array<{ x: number; y: number }> {
+    return Array.from({ length: 12 }, (_, i) => ({ x: 442 + (i % 4) * 118, y: 150 + Math.floor(i / 4) * 134 }));
+  }
+
+  private homePosition(index: number): { x: number; y: number } {
+    const left = [135, 255, 135, 255, 135, 255];
+    const right = [1005, 1130, 1005, 1130, 1005, 1130];
+    if (index < 6) return { x: left[index] ?? 135, y: 190 + Math.floor(index / 2) * 150 };
+    const local = index - 6;
+    return { x: right[local] ?? 1005, y: 190 + Math.floor(local / 2) * 150 };
+  }
+
+  private createPiece(index: number, target: { x: number; y: number }): void {
+    const saved = this.state.elaine.pieces[String(index)];
+    const home = this.homePosition(index);
+    const piece = this.add.container(saved?.x ?? home.x, saved?.y ?? home.y).setDepth(9);
+    const shadow = this.add.rectangle(4, 5, 110, 116, 0x0c0b09, .28);
+    const image = this.add.image(0, 0, `elaine-piece-${index}`).setDisplaySize(106, 112);
+    const edge = this.add.rectangle(0, 0, 110, 116, 0xffffff, .001).setStrokeStyle(2, 0x463f35, .85);
+    piece.add([shadow, image, edge]);
+    const initialAngle = saved?.rotation ?? ((index * 90 + 90) % 360);
+    piece.setAngle(initialAngle);
+    piece.setSize(118, 124).setInteractive({ useHandCursor: true });
+    this.input.setDraggable(piece);
+
+    let pointerDownAt = 0;
+    let dragged = false;
+    piece.on('pointerdown', () => {
+      pointerDownAt = this.time.now;
+      dragged = false;
+      this.selectedIndex = index;
+      this.pulse(piece);
+    });
+    piece.on('dragstart', () => {
+      dragged = true;
+      piece.setDepth(18).setScale(1.045);
+      this.focusCamera(620, 300, 1.025, 130);
+    });
+    piece.on('drag', (_p: Phaser.Input.Pointer, x: number, y: number) => piece.setPosition(x, y));
+    piece.on('dragend', () => {
+      piece.setDepth(9).setScale(1);
+      this.resetCamera(130);
+      this.trySnap(index, piece, target);
+    });
+    piece.on('pointerup', () => {
+      if (!dragged && this.time.now - pointerDownAt < 260 && piece.input?.enabled) this.rotateSelected(90);
+    });
+
+    if (saved?.snapped) {
+      piece.setPosition(target.x, target.y).setAngle(ELAINE_TARGET_ROTATIONS[index] ?? 0).disableInteractive();
+    }
+    this.pieces[index] = piece;
+  }
+
+  private rotateSelected(delta = 90): void {
+    const piece = this.pieces[this.selectedIndex];
+    if (!piece || !piece.input?.enabled) return;
+    const targetAngle = Math.round((piece.angle + delta) / 90) * 90;
+    if (this.state.settings.reducedMotion) piece.setAngle(targetAngle);
+    else this.tweens.add({ targets: piece, angle: targetAngle, duration: 120, ease: 'Sine.easeOut' });
+    this.audio.playSfx('glass', .12);
+    const target = this.targetPositions()[this.selectedIndex];
+    this.time.delayedCall(this.state.settings.reducedMotion ? 0 : 125, () => { if (target) this.trySnap(this.selectedIndex, piece, target, false); });
+  }
+
+  private trySnap(index: number, piece: Phaser.GameObjects.Container, target: { x: number; y: number }, bounce = true): void {
+    const targetRotation = ELAINE_TARGET_ROTATIONS[index] ?? 0;
+    const close = Phaser.Math.Distance.Between(piece.x, piece.y, target.x, target.y) < 82;
+    const rotationOk = elainePieceSolved(piece.angle, targetRotation);
+    if (close && rotationOk) {
+      piece.disableInteractive();
+      this.settleContainer(piece, target.x, target.y, 220);
+      this.store.mutate((s) => { s.elaine.pieces[String(index)] = { x: target.x, y: target.y, rotation: targetRotation, snapped: true }; }, false);
+      this.audio.playSfx('glass', .24);
+      const glint = this.add.rectangle(target.x, target.y, 4, 112, 0xf1e6d0, .65).setAngle(-18).setDepth(16);
+      if (!this.state.settings.reducedMotion) this.tweens.add({ targets: glint, x: target.x + 54, alpha: 0, duration: 240, onComplete: () => glint.destroy() });
+      else glint.destroy();
+      if (Object.values(this.state.elaine.pieces).filter((p) => p.snapped).length >= 12) this.finish();
+      return;
+    }
+    this.store.mutate((s) => { s.elaine.pieces[String(index)] = { x: piece.x, y: piece.y, rotation: piece.angle, snapped: false }; }, false);
+    if (bounce && close && !rotationOk) {
+      this.audio.playSfx('glass', .12);
+      this.nudge(piece, index % 2 === 0 ? 7 : -7);
+    }
+  }
+
+  private finish(): void {
+    this.store.mutate((s) => { s.elaine.completed = true; });
+    this.completeMask('elaine', 'elaine-habit');
+    this.store.flush();
+    if (this.state.settings.reducedMotion) this.mirrorVeil.setAlpha(.06);
+    else this.tweens.add({ targets: this.mirrorVeil, alpha: .06, duration: 720, ease: 'Sine.easeOut' });
+    this.ui.setCaption('十二块不同年份的脸拼回同一面镜子。真正连续的不是相貌，而是她抬手、侧身和迟疑的方式。');
+    this.audio.playSfx('glass', .6);
+    this.time.delayedCall(this.state.settings.reducedMotion ? 0 : 480, () => this.addNavArrow('forward', () => this.navigate('shop')));
   }
 }

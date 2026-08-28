@@ -1,42 +1,67 @@
-export const MAIN_MASKS=['mayor','butcher','elaine','milo','postman'] as const;
-export const MASKS:any={
- mayor:{name:'镇长 · 奥斯文',residue:'res_bian',label:'辨 · 鼻子',image:'mayor.webp',verb:'翻 / 放 / 对照'},
- butcher:{name:'屠夫 · 格伦',residue:'res_yan',label:'言 · 嘴唇',image:'butcher.webp',verb:'摆放 / 拉椅'},
- elaine:{name:'舞台女郎 · 伊莲',residue:'res_ting',label:'听 · 耳朵',image:'elaine.webp',verb:'拖 / 转 / 拼'},
- milo:{name:'鞋匠之子 · 米罗',residue:'res_jian',label:'见 · 眼睛',image:'milo.webp',verb:'切换 / 搬动'},
- postman:{name:'邮差 · 埃利亚斯',residue:'res_xing',label:'行 · 眉毛',image:'postman.webp',verb:'走 / 转身'},
- soren:{name:'盲眼老人 · 索伦',residue:'res_wen',label:'温 · 脸颊',image:'soren.webp',verb:'敲 / 扫描'},
- blank:{name:'给自己的空白',residue:'res_blank',label:'未定形 · 透明残响',image:'blank.webp',verb:'靠近 / 拿起'}
+import type { MaskId, ObservationId, RelationId, ResidueId, SceneId } from '../core/GameState';
+
+export const MASK_LABELS: Record<MaskId, string> = {
+  mayor: '奥斯文 · 鼻梁残响',
+  butcher: '格伦 · 嘴唇残响',
+  elaine: '伊莲 · 耳朵残响',
+  milo: '米罗 · 眼睛残响',
+  postman: '埃利亚斯 · 眉毛残响',
 };
-export const OBS:any={
- box_eye:{title:'镜中木盒先长出眼睛',text:'现实木盒仍然空白。五官来自关系，不来自盒面本身。',group:'物理'},
- box_missing:{title:'五官不是五枚开关',text:'灯、镜子、娃娃、反光和坐姿改变的是关系。',group:'工艺'},
- jars:{title:'七只玻璃罐只保存功能',text:'见、辨、听、行、言、温与未定形并不是七个人格。',group:'工艺'},
- master_rule:{title:'师父不打死结',text:'习惯比相貌稳定，却仍不能单独定义一个人。',group:'行为'},
- water_reverse:{title:'只有墙钟没有服从倒流',text:'时间异常可被手动操纵；第三声之后镜面起雾。',group:'时间'},
- mother_note:{title:'“不要替他——”',text:'句子在镜雾中没有写完。缺失本身可能是信息。',group:'身份'},
- mayor_public:{title:'公开说法会改变场景',text:'同一句话在讲台与私人办公室留下不同后果。',group:'行为'},
- mayor_father:{title:'真实想法不等于真实行为',text:'要用物证同时校验公开与私人叙事。',group:'行为'},
- butcher_six:{title:'六份档案对应六种稳定习惯',text:'座位错误时，动物会用行为拒绝。',group:'空间'},
- butcher_sender:{title:'第七把椅子属于送行者',text:'格伦总在安排告别，却从不让自己坐下。',group:'身份'},
- elaine_habit:{title:'不同年龄共享同一动作习惯',text:'旧耳洞、烧伤与高音前两次吸气跨越妆容与年龄。',group:'身份'},
- elaine_face:{title:'拼成的不是一张“原始脸”',text:'同步动作比任何单张脸更稳定。',group:'身份'},
- milo_monster:{title:'怪物与现实物件占据同一位置',text:'面具改变观察规则，而不是生成另一间房。',group:'物理'},
- milo_fear:{title:'看懂并不会让害怕消失',text:'兽形解释来自儿童认知，却仍对应现实关系。',group:'行为'},
- postman_loop:{title:'每第七步道路重置',text:'循环不是字幕，而是脚下发生的空间规则。',group:'时间'},
- postman_reverse:{title:'第6步后逆行不会重置',text:'主动后退一次会打断重复。',group:'时间'},
- soren_echo:{title:'夹层墙产生双重回声',text:'异常区域不是热点，而是声音性质改变。',group:'空间'},
- soren_voice:{title:'声纹可以画出房间',text:'视觉声纹与左右声道共同呈现距离和材质。',group:'空间'},
- blank_choice:{title:'空白残响记录主动选择',text:'它不提供正确答案，只记录阿七第一次明确想要什么。',group:'身份'},
- six_functions:{title:'六种残响让脸稳定',text:'稳定功能不等于“应该成为谁”。',group:'工艺'}
+
+export const RESIDUE_LABELS: Record<ResidueId, string> = {
+  discern: '辨 · 鼻梁',
+  speech: '言 · 嘴唇',
+  hear: '听 · 耳朵',
+  see: '见 · 眼睛',
+  act: '行 · 眉毛',
+  warm: '温 · 脸颊',
+  blank: '未定形 · 透明残响',
 };
-export const VALID_RELATIONS=[['box_eye','box_missing'],['jars','master_rule'],['water_reverse','mother_note'],['mayor_public','mayor_father'],['butcher_six','butcher_sender'],['elaine_habit','elaine_face'],['milo_monster','milo_fear'],['postman_loop','postman_reverse'],['soren_echo','soren_voice'],['blank_choice','six_functions']];
-export const MASK_EPILOGUES:any={
- mayor:['奥斯文摘下面具时，讲台后那面墙仍旧平整。','只有抽屉里的一封辞职信，比所有奖状更像他的脸。','阿七把鼻梁残响收进布袋，没有替他说完那句话。'],
- butcher:['第六只盘子被收走以后，第七把椅子还留在原地。','格伦把围裙叠得像一封正式公文，坐下时没有人鼓掌。','屋里第一次没有谁负责送别。'],
- elaine:['镜灯一盏一盏熄灭，十二张脸也跟着退进黑里。','最后留下的不是某一张面孔，而是高音之前那两次短促吸气。','习惯比妆更慢，也比名字活得久。'],
- milo:['怪物重新变成人时，房间没有因此变安全。','父亲依旧病弱，母亲依旧紧张，镇长依旧在门口换领带。','孩子只是第一次知道：害怕并不会因为看懂而消失。'],
- postman:['第七封信终于离开手心以后，海边没有发生奇迹。','风仍旧从同一个方向来，邮箱仍旧生锈。','只是那条路第一次允许一个人走到昨天以外。'],
- soren:['黑暗里最后一圈声纹慢慢散开。','索伦没有说起那张已经记不住的脸，只用指尖碰了碰表盖。','有些人离开以后，房间仍知道他们曾经站在哪里。'],
- blank:['空白面具没有学会一种新的表情。','它只是把阿七真正选过的一件东西、一条方向，安静地留了下来。','第一次，没有谁替这次选择命名。']
+
+export const MASK_RESIDUES: Record<MaskId, ResidueId> = {
+  mayor: 'discern',
+  butcher: 'speech',
+  elaine: 'hear',
+  milo: 'see',
+  postman: 'act',
+};
+
+export const OBSERVATIONS: Record<ObservationId, { title: string; text: string }> = {
+  'box-relations': { title: '上锁木盒', text: '三张试面合拢、台灯熄灭以后，高处露出一把旧钥匙；木盒中只有一张旧拓片与一团磨损的线，后室仍缺最后一件材料。' },
+  'clock-exception': { title: '水底记忆', text: '房间都在倒流，只有墙钟没有服从倒流。' },
+  'mayor-contradiction': { title: '两个半房间', text: '公开话术与私人痕迹并不总能同时成立。' },
+  'butcher-care': { title: '第七把椅子', text: '格伦的分类不是为了效率；他记住了每一个将被告别的对象。' },
+  'elaine-habit': { title: '镜片后台', text: '不同年龄的脸改变了，几个无意识动作却一直重复。' },
+  'milo-projection': { title: '怪物世界', text: '孩子画出的怪物没有改变家具的位置，只改变了对人的解释。' },
+  'postman-break': { title: '第七步', text: '第六步之后逆行不会重置；循环要求人继续向前。' },
+  'soren-space': { title: '回声房间', text: '空间可以不依赖脸而被确认；距离、材质与回声仍然稳定。' },
+  'blank-choice': { title: '给自己的空白', text: '没有一个物件被宣布为正确。选择发生时，空间才稳定下来。' },
+  'shop-memory': { title: '铺子记得', text: '熟悉的木头在不同面具之后留下了不属于装饰的变化。' },
+};
+
+export const RELATIONS: Record<RelationId, { pair: [ObservationId, ObservationId]; text: string }> = {
+  'see-discern': { pair: ['milo-projection', 'mayor-contradiction'], text: '存在“看见”与“辨别”的互证关系。' },
+  'hear-act': { pair: ['elaine-habit', 'postman-break'], text: '存在“习惯”与“主动打破节律”的互证关系。' },
+  'speech-warm': { pair: ['butcher-care', 'soren-space'], text: '存在“表达”与“在场”的互证关系。' },
+};
+
+export const SCENE_TITLES: Record<SceneId, string> = {
+  shop: '面具铺', secret: '后室', water: '水底记忆', mayor: '两个半房间', butcher: '第七把椅子',
+  elaine: '镜片后台', milo: '怪物世界', postman: '第七步', soren: '回声房间', blank: '给自己的空白',
+  finale: '三站共振', ending: '最后一张脸',
+};
+
+export const HINTS: Record<SceneId, [string, string, string]> = {
+  shop: ['先听听木偶，再观察哪几张旧面具还没有“收好”。', '把三张仍张着嘴的试面合上；随后熄灯，留意高处会出现什么。', '把矮凳挪到钥匙下面，取下钥匙后在物品栏选中它，再打开木盒。'],
+  secret: ['木盒带进来的两样东西还用得上，第三样见证物被压在后室某件日常用品底下。', '先把棉布挪开，再观察工作台三处不同的压痕与器具。', '在物品栏选中拓片、旧线或票根，再点击和它最相称的工作台部位。'],
+  water: ['先问：房间里哪一样东西没有倒流？', '不要按按钮让时间反转，直接抓住钟针。', '逆时针拖动分针到接近一整圈，再擦掉镜面雾气。'],
+  mayor: ['同一句话在两个房间里留下的痕迹可能不同。', '不是挑“最善良”的三句话，而是挑与两侧物证都不矛盾的三句。', '选择“账本公开”“码头先修”“补助不经家族账户”三句。'],
+  butcher: ['名字牌不是编号；每张记录都写着它习惯靠近什么、避开什么。', '把六张名字牌拖到桌上六个座位标记。错误时观察它为什么拒绝那个位置。', '从左到右依次为：荆棘、燕麦、白奶、土豆、胡萝卜、黑麦；全部稳定后向自己方向拉桌前的第七把椅子。'],
+  elaine: ['镜子被雾住了，碎片本身才保留后台动作。', '碎片可拖动；轻点选中后再点一次、按钮或滚轮都能旋转九十度。', '把十二块真实镜面碎片拼回中央网格，最终每片都保持正向；靠近正确位置会吸附。'],
+  milo: ['怪物和现实共用同一套坐标；先反复切换一次看法。', '白天能看清拐杖、湿布和徽章留下的生活痕迹；怪物视角才会把它们对应到三种解释。', '把旧拐杖拖到门边的牛头父亲、湿布拖到床边的猫首母亲、徽章拖到台灯旁的蛇身镇长。'],
+  postman: ['循环不是路的属性，而是“继续按原节奏走”的属性。', '注意第六步与第七步之间发生了什么。', '走到第六步后转身，再倒退一步。'],
+  soren: ['先让钟响一次，听清楚哪边比别处多回来一声。', '钟响过以后，点一下索伦靠在左墙的手杖，再拿它去敲不同位置的石墙。', '右侧偏深的位置会出现双重回声，连续确认几处后夹层会松开。'],
+  blank: ['这一次没有标准答案；桌上的三件实物都能查看。', '先点一件你愿意留下的东西，再看看白面具会不会接受它。', '选择照片、工作册或怀表中的任意一件，再点击中央白面具即可。三者不会改变终章正确与否。'],
+  finale: ['三座机器的两个槽位都画着对应的脸部轮廓，先把此前得到的残响放到最像它们的位置。', '配对正确以后，每台都会再露出一个可以直接操作的机械部件。', '复写镜=见+辨；节律槽=听+行；温声台=言+温。透明残响最终要去没有标签的空位。'],
+  ending: ['选择不是按钮。', '你要用手完成一种离开的动作。', '镜前拖入半张脸 / 一根根拔线 / 摘下面具并关灯，任一条都能完成结局。'],
 };

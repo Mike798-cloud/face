@@ -1,19 +1,167 @@
-import {BaseScene} from './BaseScene';
-import {bus} from '../../core/EventBus';
-import {audio} from '../../core/AudioManager';
 import Phaser from 'phaser';
-const P=Phaser;
-export class WaterMemoryScene extends BaseScene{
-  progress=0;fogProgress=0;hand:any;fog:any;fogRT:any;dragging=false;lastAngle=0;completed=false;
-  constructor(){super('Water')}
-  preload(){this.loadSceneImage('water-memory.webp')}
-  create(){const w=this.scale.width,h=this.scale.height;this.add.image(w/2,h/2,'bg').setDisplaySize(w,h).setTint(0x93a3a1);bus.emit('hint','房间里所有东西都在倒流，只有墙钟顺时针。抓住分针，逆时针拖动；第三声后用手擦开镜雾。');
-    const clock=this.add.container(w*.74,h*.32).setDepth(5);clock.add(this.add.circle(0,0,Math.min(w,h)*.12,0x171816,.68).setStrokeStyle(3,0xd0b98b));for(let i=0;i<12;i++){const a=P.Math.DegToRad(i*30-90),r=Math.min(w,h)*.1;clock.add(this.add.circle(Math.cos(a)*r,Math.sin(a)*r,2.2,0xd9c7a5,.85))}this.hand=this.add.rectangle(0,-Math.min(w,h)*.065,3,Math.min(w,h)*.13,0xe0cfaa,.94).setOrigin(.5,1);clock.add(this.hand);clock.setSize(Math.min(w,h)*.28,Math.min(w,h)*.28).setInteractive(new P.Geom.Circle(0,0,Math.min(w,h)*.14),P.Geom.Circle.Contains);clock.on('pointerdown',(p:any)=>{this.dragging=true;this.lastAngle=P.Math.RadToDeg(P.Math.Angle.Between(clock.x,clock.y,p.x,p.y))});this.input.on('pointerup',()=>this.dragging=false);this.input.on('pointermove',(p:any)=>{if(!this.dragging||this.completed)return;const a=P.Math.RadToDeg(P.Math.Angle.Between(clock.x,clock.y,p.x,p.y));let d=P.Math.Angle.WrapDegrees(a-this.lastAngle);this.lastAngle=a;if(d<0){this.progress=P.Math.Clamp(this.progress+Math.abs(d)/3.2,0,100);this.hand.angle=-this.progress*4.2;this.updateWorld()}else if(d>5)this.feedback('顺时针只是让墙钟继续服从原来的时间。')});
-    this.add.text(w*.5,h*.82,'水滴 ↑   烛泪 ↑   碎玻璃 ←   床单褶皱 ↶',{fontFamily:'serif',fontSize:'15px',color:'#d7ddd7',backgroundColor:'#10141199',padding:{x:12,y:7}}).setOrigin(.5).setAlpha(.78);
-    this.events.once('shutdown',()=>this.input.removeAllListeners());
-    if(this.state.prologue.water){this.completed=true;this.add.text(w*.5,h*.5,'第三声钟已经过去。\n镜上只剩“不要替他——”。',{fontFamily:'serif',fontSize:'22px',align:'center',color:'#e4dccb',backgroundColor:'#141512bb',padding:{x:20,y:14}}).setOrigin(.5);this.makeZone(w*.1,h*.1,w*.12,h*.08,'返回面具铺',()=>bus.emit('scene','shop'))}
+import { BaseScene } from './BaseScene';
+import { SCENE_INTROS } from '../../data/storyData';
+
+export class WaterMemoryScene extends BaseScene {
+  private clockHand!: Phaser.GameObjects.Rectangle;
+  private lastAngle = 0;
+  private draggingClock = false;
+  private fogCells: Phaser.GameObjects.Ellipse[] = [];
+  private cleared = new Set<number>();
+
+  constructor() { super('water'); }
+  preload(): void { this.preloadImage('bg-water', 'water-memory.webp'); }
+
+  create(): void {
+    this.ui.setScene('water');
+    this.audio.playAmbient('water', .2);
+    this.addBackground('bg-water');
+    this.addAtmosphere('water', 20);
+    this.installWaterLife();
+    const intro = SCENE_INTROS.water!;
+    this.setObjective(intro.objective);
+    this.createReverseObjects();
+    this.createClock();
+    if (this.state.water.reverseProgress >= 1) this.createFog();
+    if (this.state.water.completed) {
+      this.addExitButton();
+    } else if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
+      this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });
+      this.ui.setCaption('水把家具推向过去，墙钟却仍固执地向前。镜面上的雾没有替你解释原因。');
+    }
   }
-  updateWorld(){const cam=this.cameras.main;const p=this.progress;cam.setZoom(1+(p/100)*.015);cam.setAlpha(.96+.04*(p/100));if(p>25&&!(this as any).one){(this as any).one=1;audio.sfx('clock');this.feedback('第一声：床单褶皱消失，碎玻璃向镜框移动。',true)}if(p>50&&!(this as any).two){(this as any).two=1;audio.sfx('clock');this.feedback('第二声：水线从墙脚退回天花板。',true)}if(p>=83&&!this.fog){audio.sfx('clock');this.spawnFog()}}
-  spawnFog(){const w=this.scale.width,h=this.scale.height;this.fog=this.add.container(0,0).setDepth(30);this.fog.add(this.add.rectangle(w/2,h/2,w,h,0x101513,.35));const mx=w*.52,my=h*.46,mw=w*.48,mh=h*.5;const rt=this.add.renderTexture(mx-mw/2,my-mh/2,mw,mh).setOrigin(0);this.fogRT=rt;const g=this.make.graphics({x:0,y:0}, false);g.fillStyle(0xd8d4c8,.92);g.fillRect(0,0,mw,mh);for(let i=0;i<80;i++){g.fillStyle(0xbec8c5,P.Math.FloatBetween(.04,.16));g.fillCircle(P.Math.Between(0,mw),P.Math.Between(0,mh),P.Math.Between(8,36))}rt.draw(g);this.fog.add(rt);this.fog.add(this.add.text(mx,my-mh/2-28,'第三声。镜子起雾了。',{fontFamily:'serif',fontSize:'18px',color:'#eee5d5'}).setOrigin(.5));const brush=this.make.graphics({x:0,y:0}, false);brush.fillStyle(0xffffff,1);brush.fillCircle(0,0,26);rt.setInteractive(new P.Geom.Rectangle(0,0,mw,mh),P.Geom.Rectangle.Contains);let wiping=false;rt.on('pointerdown',()=>wiping=true);this.input.on('pointerup',()=>wiping=false);this.input.on('pointermove',(p:any)=>{if(!wiping||this.completed)return;const x=p.x-(mx-mw/2),y=p.y-(my-mh/2);if(x<0||y<0||x>mw||y>mh)return;rt.erase(brush,x,y);this.fogProgress=Math.min(100,this.fogProgress+1.25);if(this.fogProgress>42)this.complete()});this.feedback('别点击“完成”。用手把雾真正擦开。')}
-  complete(){if(this.completed)return;this.completed=true;this.state.prologue.water=true;this.state.visitedShopCount=Math.min(7,(this.state.visitedShopCount||0)+1);bus.emit('observation','water_reverse');bus.emit('observation','mother_note');this.store.save();this.feedback('年轻的师父与母亲出现在镜后。她只写到：“不要替他——”。',true);this.time.delayedCall(this.state.reduced?400:1800,()=>{bus.emit('chapter2')})}
+
+  private createReverseObjects(): void {
+    const droplets = Array.from({ length: 14 }, (_, i) => this.add.circle(130 + i * 72, 585 - (i % 4) * 52, 5 + (i % 3), 0x91a8a5, .55).setDepth(3));
+    const shards = Array.from({ length: 8 }, (_, i) => this.add.triangle(310 + i * 55, 530 + (i % 2) * 18, 0, 28, 16, 0, 31, 29, 0xa8bbb6, .45).setDepth(3));
+    if (!this.state.settings.reducedMotion) {
+      droplets.forEach((d, i) => this.tweens.add({ targets: d, y: d.y - 46, alpha: .2, duration: 1400 + i * 70, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));
+      shards.forEach((s, i) => this.tweens.add({ targets: s, x: s.x - 18, angle: -12, duration: 1900 + i * 80, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));
+    }
+  }
+
+  private createClock(): void {
+    const cx = 1015;
+    const cy = 260;
+    this.add.circle(cx, cy, 102, 0xd6c7a4, .9).setStrokeStyle(7, 0x343028).setDepth(5);
+    for (let i = 0; i < 12; i += 1) {
+      const angle = Phaser.Math.DegToRad(i * 30 - 90);
+      this.add.circle(cx + Math.cos(angle) * 82, cy + Math.sin(angle) * 82, 3, 0x3b362e).setDepth(6);
+    }
+    this.clockHand = this.add.rectangle(cx, cy - 46, 7, 96, 0x332d25).setOrigin(.5, .94).setDepth(7);
+    this.clockHand.rotation = -this.state.water.reverseProgress * Math.PI * 2;
+
+    // The whole clock face acts as the grab target, which is much more forgiving on touch screens.
+    const clockHit = this.add.circle(cx, cy, this.state.settings.largeTargets ? 124 : 112, 0xffffff, .001)
+      .setDepth(8)
+      .setInteractive({ useHandCursor: true });
+    clockHit.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.state.water.reverseProgress >= 1) return;
+      this.draggingClock = true;
+      this.lastAngle = Phaser.Math.Angle.Between(cx, cy, pointer.worldX, pointer.worldY);
+      if (!this.state.settings.reducedMotion) this.tweens.add({ targets: this.clockHand, scaleX: 1.2, duration: 80, yoyo: true });
+    });
+    this.input.on('pointerup', () => {
+      if (this.draggingClock) this.store.flush();
+      this.draggingClock = false;
+    });
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.draggingClock || this.state.water.reverseProgress >= 1) return;
+      const angle = Phaser.Math.Angle.Between(cx, cy, pointer.worldX, pointer.worldY);
+      const delta = Phaser.Math.Angle.Wrap(angle - this.lastAngle);
+      this.lastAngle = angle;
+
+      // Counter-clockwise increases reverse progress; clockwise motion naturally gives some progress back.
+      // This keeps the hand attached to the player's gesture instead of feeling sticky on small jitters.
+      const progress = Phaser.Math.Clamp(this.state.water.reverseProgress - delta / (Math.PI * 2), 0, 1);
+      this.store.mutate((s) => { s.water.reverseProgress = progress; }, false);
+      this.clockHand.rotation = -progress * Math.PI * 2;
+      this.applyWorldReverse(progress);
+      if (progress >= .995) {
+        this.store.mutate((s) => { s.water.reverseProgress = 1; });
+        this.store.flush();
+        this.draggingClock = false;
+        this.clockHand.rotation = -Math.PI * 2;
+        this.audio.playSfx('clock', .65);
+        this.createFog();
+      }
+    });
+  }
+
+  private applyWorldReverse(progress: number): void {
+    const tint = Phaser.Display.Color.Interpolate.ColorWithColor(
+      Phaser.Display.Color.ValueToColor(0x9a9b8c), Phaser.Display.Color.ValueToColor(0x657f82), 100, Math.floor(progress * 100),
+    );
+    this.cameras.main.setBackgroundColor(Phaser.Display.Color.GetColor(tint.r, tint.g, tint.b));
+  }
+
+  private createFog(): void {
+    if (this.fogCells.length) return;
+    const cols = 6;
+    const rows = 4;
+    for (let y = 0; y < rows; y += 1) {
+      for (let x = 0; x < cols; x += 1) {
+        const index = y * cols + x;
+        // Overlapping soft shapes remove the old checkerboard feeling while keeping save compatibility (24 cells).
+        const cell = this.add.ellipse(212 + x * 68, 188 + y * 84, 105, 120, 0xc7d0c9, .54).setDepth(12);
+        this.fogCells.push(cell);
+        if (index < this.state.water.clearedCells) { cell.setVisible(false); this.cleared.add(index); }
+      }
+    }
+    const reveal = this.add.rectangle(382, 315, 420, 330, 0x88907f, .12).setStrokeStyle(2, 0xe1d6be, .28).setDepth(10);
+    this.add.text(382, 315, '两个人的旧轮廓\n隔着雾站在同一面镜子里', {
+      fontFamily: 'Georgia, "Noto Serif SC", serif', fontSize: '18px', color: '#ddd1b8', align: 'center',
+    }).setOrigin(.5).setDepth(11);
+    reveal.setInteractive({ useHandCursor: true });
+    let wiping = false;
+    reveal.on('pointerdown', (pointer: Phaser.Input.Pointer) => { wiping = true; this.wipe(pointer.worldX, pointer.worldY); });
+    this.input.on('pointerup', () => { wiping = false; this.store.flush(); });
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (wiping) this.wipe(pointer.worldX, pointer.worldY);
+    });
+    if (this.state.water.completed) this.addExitButton();
+  }
+
+  private wipe(x: number, y: number): void {
+    this.fogCells.forEach((cell, index) => {
+      if (this.cleared.has(index)) return;
+      const dx = x - cell.x;
+      const dy = y - cell.y;
+      if ((dx * dx) / (60 * 60) + (dy * dy) / (65 * 65) > 1) return;
+      this.cleared.add(index);
+      this.audio.playSfx('glass', .055);
+      this.store.mutate((s) => { s.water.clearedCells = this.cleared.size; }, false);
+      if (this.state.settings.reducedMotion) cell.setVisible(false);
+      else this.tweens.add({ targets: cell, alpha: 0, scaleX: 1.08, scaleY: 1.08, duration: 170, ease: 'Sine.easeOut', onComplete: () => cell.setVisible(false) });
+    });
+    if (this.cleared.size >= 15 && !this.state.water.completed) {
+      this.store.mutate((s) => {
+        s.water.completed = true;
+        s.water.clearedCells = this.cleared.size;
+        if (!s.observations.includes('clock-exception')) s.observations.push('clock-exception');
+        s.currentScene = 'shop';
+      });
+      this.store.flush();
+      this.audio.playSfx('clock', .75);
+      this.ui.setCaption('雾退到最后一层时，镜中两个人的轮廓没有合成一张脸。水底的门却松开了。');
+      this.time.delayedCall(this.state.settings.reducedMotion ? 0 : 420, () => this.addExitButton());
+    }
+  }
+
+  private installWaterLife(): void {
+    this.addBlinkEasterEgg(250, 228, 105, 85, 11, 9, 'glass');
+    this.addBlinkEasterEgg(785, 232, 100, 82, 10, 8, 'glass');
+    this.addPulseEasterEgg(1125, 248, 210, 360, 0xa8c5c1, 'wood');
+    if (!this.state.settings.reducedMotion) {
+      const paper = this.add.rectangle(730, 470, 40, 24, 0xd9d2ba, .18).setDepth(2).setAngle(-14);
+      this.tweens.add({ targets: paper, x: 790, y: 430, angle: 7, alpha: { from: .08, to: .24 }, duration: 3300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const chairShadow = this.add.ellipse(718, 442, 96, 24, 0x0b1212, .07).setDepth(1);
+      this.tweens.add({ targets: chairShadow, scaleX: 1.12, alpha: .025, duration: 2100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+  }
+
+  private addExitButton(): void {
+    if (this.children.getByName('water-exit')) return;
+    this.addNavArrow('forward', () => this.navigate('shop')).setName('water-exit');
+  }
 }

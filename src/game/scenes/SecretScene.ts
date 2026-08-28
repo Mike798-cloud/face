@@ -1,30 +1,251 @@
-import {BaseScene} from './BaseScene';
-import {bus} from '../../core/EventBus';
-import Phaser from 'phaser';
-const P=Phaser;
-export class SecretScene extends BaseScene{
-  constructor(){super('Secret')}
-  preload(){this.loadSceneImage('secret-room.webp')}
-  create(){const w=this.scale.width,h=this.scale.height;this.add.image(w/2,h/2,'bg').setDisplaySize(w,h).setTint(0xc9bba4);bus.emit('hint',this.state.prologue.mask?'师父面具已经完成。去水底记忆里验证那句没有写完的话。':'七只玻璃罐保存的是功能，不是人格。先取得能承担“相貌 / 习惯 / 见证”的三件材料。');
-    this.makeZone(w*.18,h*.34,w*.18,h*.28,'七只玻璃罐',()=>{bus.emit('observation','jars');this.feedback('罐中标签只有：见、辨、听、行、言、温与一只空白。',true)});
-    this.makeZone(w*.78,h*.24,w*.18,h*.18,'旧工艺笔记',()=>{bus.emit('observation','master_rule');this.feedback('师父反复写着：习惯不能替代相貌，见证也不能替代习惯。',true)});
-    this.makeZone(w*.24,h*.72,w*.16,h*.13,'半张旧面具',()=>this.take('halfmask','相貌材料被取下。纸浆表面保留师父长期佩戴后的纹理。'));
-    this.makeZone(w*.51,h*.74,w*.16,h*.13,'反复拆开的黑线',()=>this.take('blackthread','黑线没有死结，只有一次次拆开的痕迹。'));
-    this.makeZone(w*.77,h*.69,w*.16,h*.13,'童年刻痕木屑',()=>this.take('woodchip','木屑来自阿七小时候的身高刻痕——有人持续照顾过他。'));
-    this.makeZone(w*.5,h*.45,w*.19,h*.14,'面具工作台',()=>this.openCraft());
-    this.makeZone(w*.06,h*.1,w*.1,h*.08,'返回',()=>bus.emit('scene','shop'));
-    if(this.state.prologue.mask)this.makeZone(w*.5,h*.9,w*.22,h*.08,'听见水下钟声',()=>bus.emit('scene','water'));
+import { BaseScene } from './BaseScene';
+import { SCENE_INTROS } from '../../data/storyData';
+
+type TraceId = 'trace-rubbing' | 'trace-thread' | 'trace-ticket';
+type MaterialId = 'appearance' | 'habit' | 'witness';
+
+interface BenchTarget {
+  id: MaterialId;
+  accepts: TraceId;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const TRACE_ITEMS: Readonly<Record<TraceId, { label: string; icon: string }>> = {
+  'trace-rubbing': { label: '旧拓片', icon: 'assets/images/interaction/trace-rubbing.webp' },
+  'trace-thread': { label: '磨旧线团', icon: 'assets/images/interaction/trace-thread.webp' },
+  'trace-ticket': { label: '见证票根', icon: 'assets/images/interaction/trace-ticket.webp' },
+};
+
+const TARGETS: readonly BenchTarget[] = [
+  { id: 'appearance', accepts: 'trace-rubbing', x: 400, y: 558, width: 165, height: 112 },
+  { id: 'habit', accepts: 'trace-thread', x: 645, y: 540, width: 165, height: 126 },
+  { id: 'witness', accepts: 'trace-ticket', x: 922, y: 553, width: 190, height: 118 },
+];
+
+export class SecretScene extends BaseScene {
+  constructor() { super('secret'); }
+
+  preload(): void {
+    this.preloadImage('bg-secret', 'secret-room.webp');
+    this.preloadImage('trace-rubbing', 'interaction/trace-rubbing.webp');
+    this.preloadImage('trace-thread', 'interaction/trace-thread.webp');
+    this.preloadImage('trace-ticket', 'interaction/trace-ticket.webp');
   }
-  take(id:string,text:string){if(!this.state.inventory.includes(id))this.state.inventory.push(id);this.store.save();this.feedback(text,true)}
-  openCraft(){if(this.state.prologue.mask){this.feedback('三种职责已经固定在内衬里。');return}
-    const have=['halfmask','blackthread','woodchip'].filter(x=>this.state.inventory.includes(x));if(have.length<3){this.feedback('工作台有三个真实凹槽：相貌、习惯、见证。现在材料还不够。');return}
-    const w=this.scale.width,h=this.scale.height;const overlay=this.add.container(0,0).setDepth(20);overlay.add(this.add.rectangle(w/2,h/2,w,h,0x090a08,.78));const panel=this.add.rectangle(w/2,h/2,w*.8,h*.62,0x30271c,.96).setStrokeStyle(2,0xa88c60);overlay.add(panel);overlay.add(this.add.text(w*.5,h*.23,'师父面具 · 三个职责凹槽',{fontFamily:'serif',fontSize:'24px',color:'#eadfc8'}).setOrigin(.5));
-    const slots=[{id:'appearance',x:.3,label:'相貌',correct:'halfmask'},{id:'habit',x:.5,label:'习惯',correct:'blackthread'},{id:'witness',x:.7,label:'见证',correct:'woodchip'}];const placed:any={};let selectedItem='';const items:any={};const homes:any={};
-    const place=(id:string,target:any,c:any)=>{for(const s of slots){if(placed[s.id]===id&&s.id!==target.id){delete placed[s.id];(s as any).zone.setStrokeStyle(2,0x7f6b4f)}}placed[target.id]=id;c.x=w*target.x;c.y=h*.52;if(id===target.correct){target.zone.setStrokeStyle(2,0x82936f);this.feedback(`${target.label}凹槽接受了这件材料。`,true)}else{target.zone.setStrokeStyle(2,0x8e5747);this.worldError(target.id)}selectedItem=''};
-    for(const s of slots){const z=this.add.rectangle(w*s.x,h*.5,w*.16,h*.2,0x161612,.7).setStrokeStyle(2,0x7f6b4f).setInteractive();overlay.add(z);overlay.add(this.add.text(w*s.x,h*.39,s.label,{fontFamily:'serif',fontSize:'16px',color:'#d2bea0'}).setOrigin(.5));(s as any).zone=z;z.on('pointerdown',()=>{if(selectedItem){place(selectedItem,s,items[selectedItem])}else this.feedback(`${s.label}凹槽需要一件能承担“${s.label}”职责的材料。`)})}
-    const names:any={halfmask:'半张旧面具',blackthread:'黑线',woodchip:'木屑'};have.forEach((id,i)=>{const home={x:w*(.32+i*.18),y:h*.76};homes[id]=home;const c=this.add.container(home.x,home.y);items[id]=c;c.add([this.add.rectangle(0,0,w*.15,h*.08,0x8d7959,.95).setStrokeStyle(1,0xe0c79c),this.add.text(0,0,names[id],{fontFamily:'serif',fontSize:'14px',color:'#17130e'}).setOrigin(.5)]);c.setSize(w*.15,h*.09).setInteractive({draggable:true});(c as any).item=id;this.input.setDraggable(c);c.on('pointerdown',()=>{selectedItem=id;this.feedback(`拿起：${names[id]}。可拖入凹槽，触屏也可再点一个凹槽。`)});c.on('drag',(_:any,x:number,y:number)=>{c.x=x;c.y=y});c.on('dragend',()=>{let target:any=null;for(const s of slots)if(P.Geom.Intersects.RectangleToRectangle(c.getBounds(),(s as any).zone.getBounds()))target=s;if(!target){c.x=home.x;c.y=home.y;return}place(id,target,c)});overlay.add(c)});
-    const confirm=this.add.text(w*.5,h*.88,'缝合内衬',{fontFamily:'serif',fontSize:'18px',color:'#efe2c8',backgroundColor:'#3d3326',padding:{x:16,y:9}}).setOrigin(.5).setInteractive({useHandCursor:true});overlay.add(confirm);confirm.on('pointerdown',()=>{const ok=slots.every(s=>placed[s.id]===s.correct);if(!ok){this.state.mistakes++;this.store.save();this.worldError('all');return}this.state.prologue.mask=true;this.state.inventory=this.state.inventory.filter((x:string)=>!['halfmask','blackthread','woodchip'].includes(x));if(!this.state.inventory.includes('mastermask'))this.state.inventory.push('mastermask');this.store.save();this.feedback('纹理、嘴角与内衬依次固定。面具内部传来水下第三声钟。',true);overlay.destroy();this.scene.restart({state:this.state,ui:this.ui,store:this.store})});
-    const close=this.add.text(w*.88,h*.19,'×',{fontFamily:'serif',fontSize:'28px',color:'#eadfc8'}).setInteractive();overlay.add(close);close.on('pointerdown',()=>overlay.destroy());
+
+  create(): void {
+    this.ui.setScene('secret');
+    this.audio.playAmbient('shop', .17);
+    this.addBackground('bg-secret');
+    this.addAtmosphere('dust', 16);
+    this.installJarLife();
+    const intro = SCENE_INTROS.secret!;
+    this.setObjective(intro.objective);
+
+    if (this.state.craft.completed) {
+      this.addNavArrow('forward', () => this.navigate('water'));
+      return;
+    }
+
+    // Compatibility only for saves created before the physical box-loot flow existed.
+    // New saves must click both objects in the open box; entering this room no longer
+    // manufactures missing evidence.
+    if (this.state.prologue.opened && !this.state.hiddenFlags.includes('prologue-box-opened-v52')) {
+      this.store.mutate((state) => {
+        if (!state.hiddenFlags.includes('trace-rubbing-found')) state.hiddenFlags.push('trace-rubbing-found');
+        if (!state.hiddenFlags.includes('trace-thread-found')) state.hiddenFlags.push('trace-thread-found');
+      }, false);
+    }
+
+    this.installBenchTargets();
+    this.createClothDrawer();
+    this.syncSceneInventory();
+    if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
+      this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });
+      this.ui.setCaption('后室里留下来的，像是三种不同的人生碎屑：轮廓、习惯，还有旁人曾经在场的证明。');
+    }
   }
-  worldError(slot:string){const map:any={appearance:'面具长出一双陌生眼睛，又慢慢缩回去：这件东西不能承担“相貌”。',habit:'线自行打成死结：这件东西没有记录师父稳定的动作习惯。',witness:'内衬短暂消失：这件东西没有证明“有人持续见证过他”。',all:'面具三个部分彼此排斥。错误材料没有被消耗，但它们告诉你职责发生了混淆。'};this.feedback(map[slot]||map.all)}
+
+  /**
+   * The workbench is deliberately point-and-click rather than a labelled matching UI:
+   * select an object in the drawer, then try it on a physical fixture in the room.
+   */
+  private installBenchTargets(): void {
+    TARGETS.forEach((target) => {
+      const tray = this.add.rectangle(target.x, target.y, target.width * .82, target.height * .64, 0x2b2119, .10)
+        .setStrokeStyle(2, 0xb9a382, .32).setDepth(7);
+      const icon = this.add.graphics().setDepth(8).setAlpha(.52);
+      icon.lineStyle(2, 0x9f8967, .72);
+      if (target.id === 'appearance') {
+        icon.strokeEllipse(target.x, target.y, 44, 56);
+        icon.lineBetween(target.x - 10, target.y - 6, target.x + 10, target.y - 6);
+      } else if (target.id === 'habit') {
+        icon.beginPath(); icon.moveTo(target.x - 28, target.y + 10); icon.lineTo(target.x - 12, target.y - 10); icon.lineTo(target.x + 4, target.y + 10); icon.lineTo(target.x + 20, target.y - 10); icon.strokePath();
+      } else {
+        icon.strokeRect(target.x - 34, target.y - 20, 68, 40);
+        icon.lineBetween(target.x - 24, target.y, target.x + 24, target.y);
+      }
+      if (!this.state.settings.reducedMotion) this.tweens.add({ targets: tray, alpha: { from: .07, to: .13 }, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+      const solved = this.state.craft[target.id];
+      if (solved) this.renderPlacedTrace(target, target.accepts, false);
+
+      const zone = this.add.zone(target.x, target.y, target.width, target.height)
+        .setDepth(18)
+        .setInteractive({ useHandCursor: true });
+
+      zone.on('pointerdown', () => {
+        if (this.state.craft[target.id]) {
+          this.audio.playSfx('wood', .07);
+          return;
+        }
+        const selected = this.ui.getSelectedSceneItem() as TraceId | null;
+        if (!selected) {
+          this.reactBench(target, false, false);
+          return;
+        }
+        if (selected !== target.accepts) {
+          this.store.mutate((state) => { state.craft.mistakes += 1; state.mistakes += 1; }, false);
+          this.reactBench(target, false, true);
+          return;
+        }
+        this.placeTrace(target, selected);
+      });
+    });
+  }
+
+  private placeTrace(target: BenchTarget, trace: TraceId): void {
+    this.store.mutate((state) => { state.craft[target.id] = true; });
+    this.ui.consumeSceneItem(trace);
+    this.audio.playSfx(target.id === 'habit' ? 'stitch' : 'paper', .34);
+    this.renderPlacedTrace(target, trace, true);
+    this.reactBench(target, true, false);
+    if (this.state.craft.appearance && this.state.craft.habit && this.state.craft.witness) {
+      this.time.delayedCall(this.state.settings.reducedMotion ? 160 : 520, () => this.finishCraft());
+    }
+  }
+
+  private renderPlacedTrace(target: BenchTarget, trace: TraceId, animate: boolean): void {
+    if (this.children.getByName(`placed:${trace}`)) return;
+    const image = this.add.image(target.x, target.y, trace).setName(`placed:${trace}`).setDepth(12).setAlpha(animate ? 0 : .9);
+    if (trace === 'trace-thread') image.setDisplaySize(92, 70).setAngle(-5);
+    else image.setDisplaySize(trace === 'trace-ticket' ? 112 : 104, trace === 'trace-ticket' ? 72 : 78).setAngle(trace === 'trace-rubbing' ? 3 : -2);
+    if (!animate || this.state.settings.reducedMotion) { image.setAlpha(.9); return; }
+    image.setScale(.72).setY(target.y - 14);
+    this.tweens.add({ targets: image, alpha: .92, scaleX: 1, scaleY: 1, y: target.y, duration: 260, ease: 'Back.easeOut' });
+  }
+
+  private reactBench(target: BenchTarget, accepted: boolean, wrongItem: boolean): void {
+    this.audio.playSfx(accepted ? 'wood' : 'knock', accepted ? .16 : .08);
+    const color = accepted ? 0xc6ad7d : 0x8b6955;
+    const ring = this.add.ellipse(target.x, target.y, target.width * .65, target.height * .56, color, .012)
+      .setStrokeStyle(1.5, color, accepted ? .28 : .18).setDepth(16);
+    if (!accepted && !wrongItem) {
+      const descriptions: Record<MaterialId, string> = {
+        appearance: '木模边缘压着浅浅的脸型轮廓，像在等一张能够留下外貌的薄纸。',
+        habit: '几枚针脚把木面磨得发亮，像在等一股多年反复回来的旧线。',
+        witness: '纸签旁留着一道扁长的压痕，像是给一张旧票根预留的位置。',
+      };
+      this.ui.setCaption(descriptions[target.id]);
+    }
+    if (wrongItem) this.ui.setCaption('这件东西在这里显得不合身。');
+    if (this.state.settings.reducedMotion) {
+      this.time.delayedCall(150, () => ring.destroy());
+      return;
+    }
+    this.tweens.add({
+      targets: ring,
+      scaleX: accepted ? 1.16 : .9,
+      scaleY: accepted ? 1.16 : 1.05,
+      alpha: 0,
+      duration: accepted ? 430 : 260,
+      ease: 'Sine.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    if (wrongItem) this.cameras.main.shake(95, .0008);
+  }
+
+  private syncSceneInventory(): void {
+    const items: Array<{ id: string; label: string; icon: string }> = [];
+    if (this.state.hiddenFlags.includes('trace-rubbing-found') && !this.state.craft.appearance) {
+      items.push({ id: 'trace-rubbing', ...TRACE_ITEMS['trace-rubbing'] });
+    }
+    if (this.state.hiddenFlags.includes('trace-thread-found') && !this.state.craft.habit) {
+      items.push({ id: 'trace-thread', ...TRACE_ITEMS['trace-thread'] });
+    }
+    if (this.state.hiddenFlags.includes('secret-ticket-found') && !this.state.craft.witness) {
+      items.push({ id: 'trace-ticket', ...TRACE_ITEMS['trace-ticket'] });
+    }
+    this.ui.setSceneItems(items);
+  }
+
+  /**
+   * More grounded than the old invisible latch: the folded cloth hides a shallow drawer.
+   * Moving the cloth aside reveals the witness ticket as a proper physical object.
+   */
+  private createClothDrawer(): void {
+    if (this.state.hiddenFlags.includes('secret-ticket-found') || this.state.craft.witness) return;
+    const cloth = this.add.ellipse(230, 544, 200, 86, 0xc6b8a3, .16).setStrokeStyle(2, 0x6e6051, .3).setDepth(11).setAngle(-6).setInteractive({ useHandCursor: true });
+    const folds = this.add.graphics().setDepth(12).setAlpha(.38);
+    folds.lineStyle(2, 0x6f6254, .52);
+    folds.beginPath();
+    folds.moveTo(150, 530); folds.lineTo(194, 516); folds.lineTo(232, 548); folds.lineTo(270, 522);
+    folds.moveTo(166, 552); folds.lineTo(208, 542); folds.lineTo(252, 574); folds.lineTo(305, 554);
+    folds.strokePath();
+    const drawer = this.add.rectangle(256, 576, 120, 28, 0x2d231b, .76).setStrokeStyle(2, 0x15100c, .46).setDepth(8).setAlpha(0);
+    const ticket = this.add.image(256, 554, 'trace-ticket').setDisplaySize(92, 58).setDepth(9).setAlpha(0).setInteractive({ useHandCursor: true });
+    ticket.disableInteractive();
+
+    let opened = false;
+    const reveal = (): void => {
+      if (opened) return;
+      opened = true;
+      this.audio.playSfx('paper', .24);
+      this.ui.setCaption('棉布底下压着一个浅抽屉，里面只留了一张旧票根。');
+      ticket.setInteractive({ useHandCursor: true });
+      if (this.state.settings.reducedMotion) {
+        cloth.setVisible(false); folds.setVisible(false); drawer.setAlpha(1); ticket.setAlpha(.95);
+        return;
+      }
+      this.tweens.add({ targets: [cloth, folds], x: '-=88', y: '+=18', angle: -18, alpha: 0, duration: 260, ease: 'Cubic.easeOut', onComplete: () => { cloth.setVisible(false); folds.setVisible(false); } });
+      this.tweens.add({ targets: drawer, alpha: 1, y: 590, duration: 220, ease: 'Sine.easeOut' });
+      this.tweens.add({ targets: ticket, alpha: .95, y: 566, duration: 260, delay: 80, ease: 'Sine.easeOut' });
+    };
+
+    cloth.on('pointerdown', reveal);
+    ticket.on('pointerdown', () => {
+      this.store.mutate((state) => {
+        if (!state.hiddenFlags.includes('secret-ticket-found')) state.hiddenFlags.push('secret-ticket-found');
+      });
+      this.syncSceneInventory();
+      this.audio.playSfx('paper', .3);
+      ticket.disableInteractive();
+      if (this.state.settings.reducedMotion) { ticket.destroy(); drawer.destroy(); return; }
+      this.tweens.add({ targets: ticket, x: 640, y: 692, scaleX: .58, scaleY: .58, alpha: 0, duration: 320, ease: 'Cubic.easeIn', onComplete: () => { ticket.destroy(); drawer.destroy(); } });
+    });
+  }
+
+  private installJarLife(): void {
+    const xs = [132, 286, 438, 590, 742, 894, 1046, 1195];
+    xs.forEach((x, i) => {
+      this.addMouthEasterEgg(x, 236, 104, 190, 24 + (i % 3) * 3, 10 + (i % 2) * 3, 'breath');
+      if (!this.state.settings.reducedMotion && i % 2 === 0) {
+        const bubble = this.add.circle(x + 25, 300, 3, 0xcdd7d1, .16).setDepth(2);
+        this.tweens.add({ targets: bubble, y: 185, x: x + 18, alpha: 0, duration: 2800 + i * 130, repeat: -1, delay: i * 260, onRepeat: () => bubble.setPosition(x + 25, 305).setAlpha(.16) });
+      }
+    });
+  }
+
+  private finishCraft(): void {
+    if (this.state.craft.completed) return;
+    this.ui.setSceneItems([]);
+    this.store.mutate((s) => { s.craft.completed = true; s.currentScene = 'water'; });
+    const mask = this.add.ellipse(645, 455, 180, 230, 0xc6b18b, .9).setStrokeStyle(5, 0x3a2c21).setDepth(10);
+    if (!this.state.settings.reducedMotion) this.tweens.add({ targets: mask, alpha: { from: .2, to: .92 }, scale: { from: .7, to: 1 }, duration: 1300 });
+    this.audio.playSfx('wood', .5);
+    this.ui.setCaption('拓片、旧线和票根都落进木模后，后墙传来一声闷钟。一滴水从地面缓慢升向天花板。');
+    this.time.delayedCall(this.state.settings.reducedMotion ? 0 : 520, () => this.addNavArrow('forward', () => this.navigate('water')));
+  }
 }
