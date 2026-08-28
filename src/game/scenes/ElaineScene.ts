@@ -2,8 +2,20 @@ import {BaseScene} from './BaseScene';
 import {bus} from '../../core/EventBus';
 import Phaser from 'phaser';
 const P=Phaser;
+
+type ShardMeta = {
+  id: string;
+  feature: string;
+  age: string;
+  solved: boolean;
+  inSlot: boolean;
+  homeX: number;
+  homeY: number;
+};
+
+type ShardContainer = Phaser.GameObjects.Container & { meta: ShardMeta };
 export class ElaineScene extends BaseScene{
-  focused:any=null;
+  focused:ShardContainer|null=null;
   constructor(){super('Elaine')}
   preload(){this.loadSceneImage('elaine.webp')}
   create(){
@@ -21,8 +33,8 @@ export class ElaineScene extends BaseScene{
       slots.push({x,y,feature,age,z});
     }));
     const solved=new Set<string>();
-    const shards:any[]=[];
-    const attempt=(c:any)=>{
+    const shards:ShardContainer[]=[];
+    const attempt=(c:ShardContainer)=>{
       const m=c.meta;if(m.solved)return;
       let best:any=null,dist=1e9;
       for(const s of slots){const d=P.Math.Distance.Between(c.x,c.y,s.x,s.y);if(d<dist){dist=d;best=s}}
@@ -39,7 +51,7 @@ export class ElaineScene extends BaseScene{
       const i=ri*3+ci;const homeX=w*(.11+(i%3)*.1),homeY=h*(.22+Math.floor(i/3)*.18);
       const poly=this.add.polygon(0,0,[0,-32,38,-18,30,27,-8,35,-36,8],0x9aa6a2,.54).setStrokeStyle(2,0xd8d4c7,.7);
       const text=this.add.text(0,0,`${age}\n${feature}`,{fontFamily:'serif',fontSize:'10px',color:'#f0eadf',align:'center'}).setOrigin(.5);
-      const c=this.add.container(homeX,homeY,[poly,text]);c.setSize(80,70).setInteractive({draggable:true,useHandCursor:true});this.input.setDraggable(c);
+      const c=this.add.container(homeX,homeY,[poly,text]) as ShardContainer;c.setSize(80,70).setInteractive({draggable:true,useHandCursor:true});this.input.setDraggable(c);
       c.angle=[90,180,270,0][i%4];c.meta={id:`${age}-${feature}`,feature,age,solved:false,inSlot:false,homeX,homeY};
       let moved=0;
       c.on('pointerdown',()=>{this.focused=c;moved=0});
