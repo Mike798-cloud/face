@@ -1,0 +1,25 @@
+{
+  "name": "the-face-of-it",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:assets": "node scripts/sync-static-assets.mjs",
+    "dev": "npm run prepare:assets && vite",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run prepare:assets && npm run typecheck && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "5.7.2",
+    "vite": "6.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "packageManager": "npm@10.9.2"
+}
