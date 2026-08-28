@@ -39,6 +39,8 @@ export class MiloScene extends BaseScene {
     this.setMonsterMode(this.state.milo.monsterMode, false);
     this.modeButton = this.createViewMask();
     PROPS.forEach((prop) => this.createProp(prop));
+    this.scheduleObjectGlint(1052, 612, 90, 106, 3900);
+    this.scheduleObjectGlint(PROPS[0]!.x, PROPS[0]!.y, 88, 96, 5200);
     if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
       this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });
       this.ui.setCaption('米罗的房间没有两套家具。只有两种看法叠在同一个位置上。先看看白天留下了什么。');
@@ -65,8 +67,11 @@ export class MiloScene extends BaseScene {
     this.realityLayer.add(wash);
     ANCHORS.forEach((anchor) => {
       if (this.isRestored(anchor.id)) return;
-      const ring = this.add.circle(anchor.x, anchor.y, anchor.radius, 0xf4ead6, .018).setStrokeStyle(2, 0xe5d7bd, .32);
-      this.realityLayer.add(ring);
+      // Daylight leaves local wear rather than a game-like target ring: a rubbed door edge,
+      // a damp bedside patch and a badge scratch near the lamp.
+      const wear = this.add.ellipse(anchor.x, anchor.y + 38, anchor.radius * 1.05, Math.max(34, anchor.radius * .38), 0xe6d8bd, .045);
+      wear.setAngle(anchor.id === 'cat' ? -7 : anchor.id === 'snake' ? 8 : 2);
+      this.realityLayer.add(wear);
     });
   }
 

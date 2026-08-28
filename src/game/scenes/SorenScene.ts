@@ -17,6 +17,7 @@ export class SorenScene extends BaseScene {
     if (this.state.soren.completed) { this.addNavArrow('forward', () => this.navigate('shop')); return; }
     const wall = this.add.rectangle(640, 365, 1060, 470, 0x0f1110, .018).setDepth(3);
     this.createWallCane(wall);
+    if (!this.state.hiddenFlags.includes('soren-listening-ready')) this.scheduleObjectGlint(658, 250, 92, 120, 3800);
     if (this.state.soren.opened || this.state.soren.scanHits.length >= 3) this.openCavity();
     if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
       this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });

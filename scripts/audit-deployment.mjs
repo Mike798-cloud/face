@@ -60,6 +60,7 @@ const workflowGuards = [
   ['actions: read', /\bactions:\s*read\b/],
   ['checkout v7', /actions\/checkout@v7\b/],
   ['setup-node v7', /actions\/setup-node@v7\b/],
+  ['legacy cleanup', /run:\s*node scripts\/cleanup-legacy\.mjs\b/],
   ['npm ci', /run:\s*npm ci\b/],
   ['typecheck', /run:\s*npm run typecheck\b/],
   ['logic regression', /run:\s*npm run test:logic\b/],
@@ -71,6 +72,13 @@ const workflowGuards = [
   ['dist artifact', /path:\s*\.\/dist\b/],
 ];
 for (const [label, pattern] of workflowGuards) if (!pattern.test(workflow)) fail(`deploy.yml is missing ${label}`);
+
+const cleanupStep = workflow.indexOf('run: node scripts/cleanup-legacy.mjs');
+const manifestAuditStep = workflow.indexOf('run: node scripts/audit-deployment.mjs');
+const installStep = workflow.indexOf('run: npm ci');
+if (cleanupStep < 0 || manifestAuditStep <= cleanupStep || installStep <= manifestAuditStep) {
+  fail('deploy.yml must clean the legacy runtime before manifest audit, then run npm ci');
+}
 
 const testScript = String(pkg.scripts?.['test:logic'] ?? '');
 const testRefs = [...testScript.matchAll(/tests\/([A-Za-z0-9._-]+\.test\.ts)/g)].map((m) => `tests/${m[1]}`);

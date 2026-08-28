@@ -35,6 +35,7 @@ export class FinaleScene extends BaseScene {
     this.normalizeAssignments();
     STATIONS.forEach((station) => this.drawStation(station));
     this.createResidueTokens();
+    if (this.tokens.length) this.scheduleObjectGlint(this.tokens[0]!.home.x, this.tokens[0]!.home.y, 68, 68, 4400);
     this.restoreStationState();
 
     if (Object.values(this.state.finale.stations).every((item) => item.completed) || this.state.finale.motherShown) this.showMotherState();

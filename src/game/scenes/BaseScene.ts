@@ -166,6 +166,28 @@ export abstract class BaseScene extends Phaser.Scene {
     this.ui.setObjective(text);
   }
 
+  /**
+   * A delayed sheen across a real scene object. It is intentionally weaker than a UI
+   * hotspot ring: players still discover the object by looking at the room, but a long
+   * idle no longer leaves them staring at a completely inert painting.
+   */
+  protected scheduleObjectGlint(x: number, y: number, width: number, height: number, delay = 4200): void {
+    if (this.state.settings.reducedMotion) return;
+    this.time.delayedCall(delay, () => {
+      if (!this.scene.isActive()) return;
+      const glint = this.add.rectangle(x - width * .34, y, 3, Math.max(34, height * .72), 0xefe4cd, .09)
+        .setAngle(16).setBlendMode(Phaser.BlendModes.ADD).setDepth(29);
+      this.tweens.add({
+        targets: glint,
+        x: x + width * .34,
+        alpha: 0,
+        duration: 720,
+        ease: 'Sine.easeOut',
+        onComplete: () => glint.destroy(),
+      });
+    });
+  }
+
   protected addAtmosphere(kind: AtmosphereKind, count = 18): void {
     if (kind === 'still' || this.state.settings.reducedMotion) return;
     const depth = -2;

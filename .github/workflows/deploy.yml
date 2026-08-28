@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Remove legacy pre-Vite runtime
+        run: node scripts/cleanup-legacy.mjs
       - name: Deployment manifest audit
         run: node scripts/audit-deployment.mjs
       - name: Install dependencies

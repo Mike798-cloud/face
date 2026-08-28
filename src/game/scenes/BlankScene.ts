@@ -37,6 +37,8 @@ export class BlankScene extends BaseScene {
 
     CHOICES.forEach((choice) => this.createChoice(choice));
     this.createBlankMaskTarget();
+    this.scheduleObjectGlint(CHOICES[0]!.x, CHOICES[0]!.y, 120, 140, 4300);
+    this.scheduleObjectGlint(640, 196, 120, 110, 5900);
     if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
       this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });
       this.ui.setCaption('这一次，三件东西都是真的。桌上的白面具没有写名字，也没有替你决定该把哪一件留给它。');

@@ -22,6 +22,7 @@ export class WaterMemoryScene extends BaseScene {
     this.setObjective(intro.objective);
     this.createReverseObjects();
     this.createClock();
+    if (this.state.water.reverseProgress < 1) this.scheduleObjectGlint(1015, 260, 190, 190, 3900);
     if (this.state.water.reverseProgress >= 1) this.createFog();
     if (this.state.water.completed) {
       this.addExitButton();
@@ -113,6 +114,7 @@ export class WaterMemoryScene extends BaseScene {
       fontFamily: 'Georgia, "Noto Serif SC", serif', fontSize: '18px', color: '#ddd1b8', align: 'center',
     }).setOrigin(.5).setDepth(11);
     reveal.setInteractive({ useHandCursor: true });
+    if (!this.state.water.completed) this.scheduleObjectGlint(382, 315, 360, 270, 3600);
     let wiping = false;
     reveal.on('pointerdown', (pointer: Phaser.Input.Pointer) => { wiping = true; this.wipe(pointer.worldX, pointer.worldY); });
     this.input.on('pointerup', () => { wiping = false; this.store.flush(); });

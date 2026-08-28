@@ -24,6 +24,9 @@ export class EndingScene extends BaseScene {
     this.createAcceptPath();
     this.createUnfixedPath();
     this.createClosePath();
+    this.scheduleObjectGlint(120, 545, 90, 140, 4500);
+    this.scheduleObjectGlint(640, 205, 100, 90, 5700);
+    this.scheduleObjectGlint(1085, 520, 210, 90, 6900);
     if (!this.state.hiddenFlags.includes(`${intro.flag}:seen`)) {
       this.store.mutate((state) => { state.hiddenFlags.push(`${intro.flag}:seen`); });
       this.ui.setCaption('最后没有按钮，也没有标准答案。镜子、缝线和木箱都留在原处，等阿七亲手完成一种离开的动作。');

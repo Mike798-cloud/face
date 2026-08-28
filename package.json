@@ -1,19 +1,20 @@
 {
   "name": "the-face-of-it",
-  "version": "5.3.0",
+  "version": "5.4.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "cleanup:legacy": "node scripts/cleanup-legacy.mjs",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "test:logic": "node --experimental-strip-types tests/logic.test.ts && node --experimental-strip-types tests/flow.test.ts && node --experimental-strip-types tests/regression.test.ts && node --experimental-strip-types tests/cinematic.test.ts && node --experimental-strip-types tests/scene-flow.test.ts && node --experimental-strip-types tests/design-regression.test.ts && node --experimental-strip-types tests/dialogue-media.test.ts && node --experimental-strip-types tests/release-regression.test.ts",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
-    "verify": "npm run sync:art && npm run audit && npm run typecheck && npm run test:logic && npm run build && npm run audit:dist",
+    "verify": "npm run cleanup:legacy && npm run sync:art && npm run audit && npm run typecheck && npm run test:logic && npm run build && npm run audit:dist",
     "audit": "node scripts/audit-project.mjs",
     "sync:art": "node scripts/sync-original-art.mjs",
     "predev": "npm run sync:art",
-    "prebuild": "npm run sync:art",
+    "prebuild": "npm run cleanup:legacy && npm run sync:art",
     "audit:dist": "node scripts/audit-dist.mjs"
   },
   "dependencies": {

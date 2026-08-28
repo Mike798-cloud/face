@@ -52,6 +52,7 @@ export class PostmanScene extends BaseScene {
     const forwardRoad = this.add.zone(950, 470, 520, 310).setDepth(6).setInteractive({ useHandCursor: true });
     backRoad.on('pointerdown', () => this.move(-1));
     forwardRoad.on('pointerdown', () => this.move(1));
+    if (this.step === 0) this.scheduleObjectGlint(930, 520, 260, 90, 4200);
 
     if (this.escaped) this.finishRoad();
     else this.renderStepState(false);

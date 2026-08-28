@@ -22,7 +22,12 @@ assert.match(shop, /prologue-box-opened-v52/, 'partially opened case state must 
 
 const secret = read('src/game/scenes/SecretScene.ts');
 assert.match(secret, /createClothDrawer/, 'secret room must use a physical cloth/drawer discovery');
-assert.match(secret, /strokeEllipse|strokeRect/, 'workbench must visually advertise its receptacles');
+assert.match(secret, /installJarPuzzle/, 'secret room must begin with a physical jar inspection rather than an abstract workbench target');
+assert.match(secret, /secret-pointclick-v54-seen/, 'secret room must give a versioned first-action affordance to existing saves');
+assert.match(secret, /this\.ui\.setSceneItems\(\[\]\)/, 'secret room evidence must stay in the world instead of a tiny HTML inventory');
+assert.match(secret, /this\.input\.setDraggable\(sprite\)/, 'secret-room traces must be directly draggable physical objects');
+assert.match(secret, /revealWaterPassage/, 'finishing the secret-room craft must physically reveal the next space');
+assert.doesNotMatch(secret, /getSelectedSceneItem/, 'secret-room puzzle must not regress to select-item-then-click-target UI');
 assert.match(secret, /prologue\.opened && !this\.state\.hiddenFlags\.includes\('prologue-box-opened-v52'\)/, 'only legacy saves may receive pre-v5.2 box traces automatically');
 
 const mayor = read('src/game/scenes/MayorScene.ts');
@@ -42,6 +47,7 @@ assert.doesNotMatch(butcher, /createNameCards/, 'old text-card seating implement
 
 assert.match(base, /installWorldInspectables/, 'painted rooms must expose optional tactile world reactions beyond puzzle-only hotspots');
 assert.match(base, /playInspectableReaction/, 'optional world objects must visibly respond instead of behaving like inert background art');
+assert.match(base, /scheduleObjectGlint/, 'ambiguous first actions must have a delayed in-world affordance instead of tutorial arrows');
 
 const milo = read('src/game/scenes/MiloScene.ts');
 assert.match(milo, /createViewMask/, 'Milo view switch must be an in-world mask rather than a generic UI toggle');
